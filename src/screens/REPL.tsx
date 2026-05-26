@@ -1138,8 +1138,7 @@ export function REPL({
   const agentTitle = mainThreadAgentDefinition?.agentType;
   const alienAgentProject = process.env.ALIEN_AGENT_PROJECT;
   const alienAgentSessionId = process.env.ALIEN_AGENT_SESSION_ID;
-  const alienAgentProjectTitle = alienAgentProject ? `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}` : undefined;
-  const terminalTitle = alienAgentProjectTitle ?? sessionTitle ?? agentTitle ?? haikuTitle ?? 'Alien Code';
+  let terminalTitle = (alienAgentProject ? `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}` : undefined) ?? sessionTitle ?? agentTitle ?? haikuTitle ?? 'Alien Code';
   const isWaitingForApproval = toolUseConfirmQueue.length > 0 || promptQueue.length > 0 || pendingWorkerRequest || pendingSandboxRequest;
   // Local-jsx commands (like /plugin, /config) show user-facing dialogs that
   // wait for input. Require jsx != null — if the flag is stuck true but jsx
@@ -1253,6 +1252,20 @@ export function REPL({
   if (feature('AWAY_SUMMARY')) {
     // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
     useAwaySummary(messages, setMessages, isLoading);
+  }
+  // Alien Agent status for external program consumption via terminal title
+  if (alienAgentProject) {
+    const alienAgentStatus: string = (() => {
+      if (isWaitingForApproval || isShowingLocalJSXCommand) return 'input';
+      if (isLoading) return 'working';
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg && (
+        ('isApiErrorMessage' in lastMsg && lastMsg.isApiErrorMessage) ||
+        (lastMsg.type === 'system' && 'subtype' in lastMsg && lastMsg.subtype === 'api_error')
+      )) return 'error';
+      return 'done';
+    })();
+    terminalTitle = `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}:${alienAgentStatus}`;
   }
   const [cursor, setCursor] = useState<MessageActionsState | null>(null);
   const cursorNavRef = useRef<MessageActionsNav | null>(null);
@@ -2688,7 +2701,7 @@ export function REPL({
     // useDeferredHookMessages) and attachment messages (appended by
     // processTextPrompt) — both pushed length past 1 on turn one, so the
     // title silently fell through to the "Claude Code" default.
-    if (!titleDisabled && !alienAgentProjectTitle && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
+    if (!titleDisabled && !alienAgentProject && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
       const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
       const text = firstUserMessage?.type === 'user' ? getContentText(firstUserMessage.message.content) : null;
       // Skip synthetic breadcrumbs — slash-command output, prompt-skill
