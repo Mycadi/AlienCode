@@ -37,6 +37,10 @@ import {
 } from '../../utils/envUtils.js'
 import { createCodexFetch, isCodexModel } from './codex-fetch-adapter.js'
 import {
+  createOpenAICompatibleFetch,
+  isOpenAICompatibleChatCompletionsUrl,
+} from './openai-compatible-fetch-adapter.js'
+import {
   createOpenCodeZenFetch,
   isOpenCodeZenFreeModel,
 } from './opencode-zen-fetch-adapter.js'
@@ -307,6 +311,26 @@ export async function getAnthropicClient({
     }
     // we have always been lying about the return type - this doesn't support batching or models
     return new AnthropicVertex(vertexArgs) as unknown as Anthropic
+  }
+
+  // ── OpenAI-compatible chat/completions via apikey.json ──────────────
+  if (
+    process.env.ANTHROPIC_AUTH_TOKEN &&
+    isOpenAICompatibleChatCompletionsUrl(process.env.ANTHROPIC_BASE_URL)
+  ) {
+    const openAICompatibleFetch = createOpenAICompatibleFetch({
+      apiKey: process.env.ANTHROPIC_AUTH_TOKEN,
+      endpoint: process.env.ANTHROPIC_BASE_URL,
+      model: process.env.ANTHROPIC_MODEL || model,
+    })
+    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
+      apiKey: 'openai-compatible-placeholder',
+      baseURL: 'https://api.anthropic.com',
+      ...ARGS,
+      fetch: openAICompatibleFetch,
+      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+    }
+    return new Anthropic(clientConfig)
   }
 
   // ── Codex (OpenAI) provider via fetch adapter ─────────────────────
