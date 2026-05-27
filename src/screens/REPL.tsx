@@ -1255,17 +1255,7 @@ export function REPL({
   }
   // Alien Agent status for external program consumption via terminal title
   if (alienAgentProject) {
-    const alienAgentStatus: string = (() => {
-      if (isWaitingForApproval || isShowingLocalJSXCommand) return 'input';
-      if (isLoading) return 'working';
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg && (
-        ('isApiErrorMessage' in lastMsg && lastMsg.isApiErrorMessage) ||
-        (lastMsg.type === 'system' && 'subtype' in lastMsg && lastMsg.subtype === 'api_error')
-      )) return 'error';
-      if (lastMsg?.type === 'assistant' && getContentText(lastMsg.message.content)?.includes('确认执行')) return 'input';
-      return 'done';
-    })();
+    const alienAgentStatus: string = isLoading ? 'working' : 'input';
     terminalTitle = `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}:${alienAgentStatus}`;
   }
   const [cursor, setCursor] = useState<MessageActionsState | null>(null);
