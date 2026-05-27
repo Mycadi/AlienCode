@@ -1263,6 +1263,7 @@ export function REPL({
         ('isApiErrorMessage' in lastMsg && lastMsg.isApiErrorMessage) ||
         (lastMsg.type === 'system' && 'subtype' in lastMsg && lastMsg.subtype === 'api_error')
       )) return 'error';
+      if (lastMsg?.type === 'assistant' && getContentText(lastMsg.message.content)?.includes('确认执行')) return 'input';
       return 'done';
     })();
     terminalTitle = `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}:${alienAgentStatus}`;
