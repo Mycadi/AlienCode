@@ -98,6 +98,7 @@ function ApiKeyPicker({ onDone }: { onDone: LocalJSXCommandOnDone }): React.Reac
 
   return (
     <Select
+      visibleOptionCount={10}
       options={names.map(name => ({
         label: name,
         value: name,

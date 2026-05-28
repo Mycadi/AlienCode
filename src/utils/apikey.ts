@@ -135,6 +135,12 @@ export function setCurrentApiKeyProfile(name: string): CurrentApiKeyProfileResul
 }
 
 export function applyApiKeyProfileToEnv(profile: ApiKeyProfile): void {
+  // Clear all apikey-related env vars first, then set new profile values.
+  // This prevents stale values from a previous profile leaking into the
+  // model picker and other subsystems when the new profile omits a key.
+  for (const key of APIKEY_ENV_KEYS) {
+    delete process.env[key]
+  }
   for (const key of APIKEY_ENV_KEYS) {
     const value = profile[key]
     if (value !== undefined) {
