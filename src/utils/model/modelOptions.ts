@@ -421,6 +421,24 @@ export function getModelOptions(fastMode = false): ModelOption[] {
     }
   }
 
+  // Append apikey profile model mappings (haiku/sonnet/opus/subagent)
+  const apikeyMappings: Array<{ envKey: string; role: string }> = [
+    { envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', role: 'haiku' },
+    { envKey: 'ANTHROPIC_DEFAULT_SONNET_MODEL', role: 'sonnet' },
+    { envKey: 'ANTHROPIC_DEFAULT_OPUS_MODEL', role: 'opus' },
+    { envKey: 'CLAUDE_CODE_SUBAGENT_MODEL', role: 'subagent' },
+  ]
+  for (const { envKey, role } of apikeyMappings) {
+    const model = process.env[envKey]
+    if (model && !options.some(existing => existing.value === model)) {
+      options.push({
+        value: model,
+        label: model,
+        description: `${role} → ${model}`,
+      })
+    }
+  }
+
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var
   const envCustomModel = process.env.ANTHROPIC_CUSTOM_MODEL_OPTION
   if (
