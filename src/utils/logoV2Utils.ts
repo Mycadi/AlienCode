@@ -260,7 +260,7 @@ export function getLogoDisplayData(): {
   const billingType = isClaudeAISubscriber()
     ? getSubscriptionName()
     : isCodexSubscriber()
-      ? 'Codex API Billing'
+      ? 'API Billing'
       : 'API Usage Billing'
   const agentName = getInitialSettings().agent
 
