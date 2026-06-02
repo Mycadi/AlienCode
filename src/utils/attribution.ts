@@ -51,51 +51,8 @@ export type AttributionTexts = {
  * - Remote mode: returns session URL for attribution
  */
 export function getAttributionTexts(): AttributionTexts {
-  if (process.env.USER_TYPE === 'ant' && isUndercover()) {
-    return { commit: '', pr: '' }
-  }
-
-  if (getClientType() === 'remote') {
-    const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
-    if (remoteSessionId) {
-      const ingressUrl = process.env.SESSION_INGRESS_URL
-      // Skip for local dev - URLs won't persist
-      if (!isRemoteSessionLocal(remoteSessionId, ingressUrl)) {
-        const sessionUrl = getRemoteSessionUrl(remoteSessionId, ingressUrl)
-        return { commit: sessionUrl, pr: sessionUrl }
-      }
-    }
-    return { commit: '', pr: '' }
-  }
-
-  // @[MODEL LAUNCH]: Update the hardcoded fallback model name below (guards against codename leaks).
-  // For internal repos, use the real model name. For external repos,
-  // fall back to "Claude Opus 4.6" for unrecognized models to avoid leaking codenames.
-  const model = getMainLoopModel()
-  const isKnownPublicModel = getPublicModelDisplayName(model) !== null
-  const modelName =
-    isInternalModelRepoCached() || isKnownPublicModel
-      ? getPublicModelName(model)
-      : 'Claude Opus 4.6'
-  const defaultAttribution = `${BOT} Generated with [Claude Code](${PRODUCT_URL})`
-  const defaultCommit = `Co-Authored-By: ${modelName} <noreply@anthropic.com>`
-
-  const settings = getInitialSettings()
-
-  // New attribution setting takes precedence over deprecated includeCoAuthoredBy
-  if (settings.attribution) {
-    return {
-      commit: settings.attribution.commit ?? defaultCommit,
-      pr: settings.attribution.pr ?? defaultAttribution,
-    }
-  }
-
-  // Backward compatibility: deprecated includeCoAuthoredBy setting
-  if (settings.includeCoAuthoredBy === false) {
-    return { commit: '', pr: '' }
-  }
-
-  return { commit: defaultCommit, pr: defaultAttribution }
+  // Attribution disabled — no Claude markers in commits or PRs
+  return { commit: '', pr: '' }
 }
 
 /**
@@ -298,97 +255,6 @@ async function getTranscriptStats(): Promise<{
 export async function getEnhancedPRAttribution(
   getAppState: () => AppState,
 ): Promise<string> {
-  if (process.env.USER_TYPE === 'ant' && isUndercover()) {
-    return ''
-  }
-
-  if (getClientType() === 'remote') {
-    const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
-    if (remoteSessionId) {
-      const ingressUrl = process.env.SESSION_INGRESS_URL
-      // Skip for local dev - URLs won't persist
-      if (!isRemoteSessionLocal(remoteSessionId, ingressUrl)) {
-        return getRemoteSessionUrl(remoteSessionId, ingressUrl)
-      }
-    }
-    return ''
-  }
-
-  const settings = getInitialSettings()
-
-  // If user has custom PR attribution, use that
-  if (settings.attribution?.pr) {
-    return settings.attribution.pr
-  }
-
-  // Backward compatibility: deprecated includeCoAuthoredBy setting
-  if (settings.includeCoAuthoredBy === false) {
-    return ''
-  }
-
-  const defaultAttribution = `${BOT} Generated with [Claude Code](${PRODUCT_URL})`
-
-  // Get AppState first
-  const appState = getAppState()
-
-  logForDebugging(
-    `PR Attribution: appState.attribution exists: ${!!appState.attribution}`,
-  )
-  if (appState.attribution) {
-    const fileStates = appState.attribution.fileStates
-    const isMap = fileStates instanceof Map
-    const fileCount = isMap ? fileStates.size : Object.keys(fileStates).length
-    logForDebugging(`PR Attribution: fileStates count: ${fileCount}`)
-  }
-
-  // Get attribution stats (transcript is read once for both prompt count and memory access)
-  const [attributionData, { promptCount, memoryAccessCount }, isInternal] =
-    await Promise.all([
-      getPRAttributionData(appState),
-      getTranscriptStats(),
-      isInternalModelRepo(),
-    ])
-
-  const claudePercent = attributionData?.summary.claudePercent ?? 0
-
-  logForDebugging(
-    `PR Attribution: claudePercent: ${claudePercent}, promptCount: ${promptCount}, memoryAccessCount: ${memoryAccessCount}`,
-  )
-
-  // Get short model name, sanitized for non-internal repos
-  const rawModelName = getCanonicalName(getMainLoopModel())
-  const shortModelName = isInternal
-    ? rawModelName
-    : sanitizeModelName(rawModelName)
-
-  // If no attribution data, return default
-  if (claudePercent === 0 && promptCount === 0 && memoryAccessCount === 0) {
-    logForDebugging('PR Attribution: returning default (no data)')
-    return defaultAttribution
-  }
-
-  // Build the enhanced attribution: "${BOT} Generated with Claude Code (93% 3-shotted by claude-opus-4-5, 2 memories recalled)"
-  const memSuffix =
-    memoryAccessCount > 0
-      ? `, ${memoryAccessCount} ${memoryAccessCount === 1 ? 'memory' : 'memories'} recalled`
-      : ''
-  const summary = `${BOT} Generated with [Claude Code](${PRODUCT_URL}) (${claudePercent}% ${promptCount}-shotted by ${shortModelName}${memSuffix})`
-
-  // Append trailer lines for squash-merge survival. Only for allowlisted repos
-  // (INTERNAL_MODEL_REPOS) and only in builds with COMMIT_ATTRIBUTION enabled —
-  // attributionTrailer.ts contains excluded strings, so reach it via dynamic
-  // import behind feature(). When the repo is configured with
-  // squash_merge_commit_message=PR_BODY (cli, apps), the PR body becomes the
-  // squash commit body verbatim — trailer lines at the end become proper git
-  // trailers on the squash commit.
-  if (feature('COMMIT_ATTRIBUTION') && isInternal && attributionData) {
-    const { buildPRTrailers } = await import('./attributionTrailer.js')
-    const trailers = buildPRTrailers(attributionData, appState.attribution)
-    const result = `${summary}\n\n${trailers.join('\n')}`
-    logForDebugging(`PR Attribution: returning with trailers: ${result}`)
-    return result
-  }
-
-  logForDebugging(`PR Attribution: returning summary: ${summary}`)
-  return summary
+  // Attribution disabled — no Claude markers in PRs
+  return ''
 }
