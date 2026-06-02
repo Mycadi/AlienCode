@@ -11,22 +11,14 @@ import {
 } from '../../utils/apikey.js'
 
 function describeProfile(profile: ApiKeyProfile): string {
-  const parts = []
-  if (profile.ANTHROPIC_MODEL) parts.push(`model: ${profile.ANTHROPIC_MODEL}`)
-  if (profile.ANTHROPIC_DEFAULT_HAIKU_MODEL) {
-    parts.push(`haiku: ${profile.ANTHROPIC_DEFAULT_HAIKU_MODEL}`)
-  }
-  if (profile.ANTHROPIC_DEFAULT_SONNET_MODEL) {
-    parts.push(`sonnet: ${profile.ANTHROPIC_DEFAULT_SONNET_MODEL}`)
-  }
-  if (profile.ANTHROPIC_DEFAULT_OPUS_MODEL) {
-    parts.push(`opus: ${profile.ANTHROPIC_DEFAULT_OPUS_MODEL}`)
-  }
-  if (profile.CLAUDE_CODE_SUBAGENT_MODEL) {
-    parts.push(`subagent: ${profile.CLAUDE_CODE_SUBAGENT_MODEL}`)
-  }
-  if (profile.ANTHROPIC_BASE_URL) parts.push(profile.ANTHROPIC_BASE_URL)
-  return parts.join(' · ')
+  const models = [
+    profile.ANTHROPIC_MODEL,
+    profile.ANTHROPIC_DEFAULT_HAIKU_MODEL,
+    profile.ANTHROPIC_DEFAULT_SONNET_MODEL,
+    profile.ANTHROPIC_DEFAULT_OPUS_MODEL,
+    profile.CLAUDE_CODE_SUBAGENT_MODEL,
+  ].filter(Boolean)
+  return models.length > 0 ? `model: ${models.join('、')}` : ''
 }
 
 function formatSuccess(name: string, profile: ApiKeyProfile): string {
