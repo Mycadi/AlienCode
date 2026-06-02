@@ -1,7 +1,7 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { Box, Text } from '../ink.js';
 import * as React from 'react';
-import { getLargeMemoryFiles, MAX_MEMORY_CHARACTER_COUNT, PROJECT_MEMORY_BASENAME, type MemoryFileInfo } from './claudemd.js';
+import { getLargeMemoryFiles, MAX_MEMORY_CHARACTER_COUNT, PROJECT_MEMORY_BASENAMES, type MemoryFileInfo } from './claudemd.js';
 import figures from 'figures';
 import { getCwd } from './cwd.js';
 import { relative, basename } from 'path';
@@ -193,12 +193,16 @@ const agentsMdDetectedNotice: StatusNoticeDefinition = {
   type: 'info',
   isActive: ctx => {
     return ctx.memoryFiles.some(file =>
-      basename(file.path).toLowerCase() === PROJECT_MEMORY_BASENAME.toLowerCase() && file.type === 'Project'
+      PROJECT_MEMORY_BASENAMES.some(name =>
+        basename(file.path).toLowerCase() === name.toLowerCase()
+      ) && file.type === 'Project'
     );
   },
   render: ctx => {
     const agentsMdFiles = ctx.memoryFiles.filter(file =>
-      basename(file.path).toLowerCase() === PROJECT_MEMORY_BASENAME.toLowerCase() && file.type === 'Project'
+      PROJECT_MEMORY_BASENAMES.some(name =>
+        basename(file.path).toLowerCase() === name.toLowerCase()
+      ) && file.type === 'Project'
     );
     const count = agentsMdFiles.length;
     const names = agentsMdFiles.map(f => basename(f.path)).join(', ');
