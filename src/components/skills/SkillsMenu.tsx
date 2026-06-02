@@ -226,7 +226,7 @@ function _temp3(skill_0) {
   const estimatedTokens = estimateSkillFrontmatterTokens(skill_0);
   const tokenDisplay = `~${formatTokens(estimatedTokens)}`;
   const pluginName = skill_0.source === "plugin" ? skill_0.pluginInfo?.pluginManifest.name : undefined;
-  return <Box key={`${skill_0.name}-${skill_0.source}`}><Text>{getCommandName(skill_0)}</Text><Text dimColor={true}>{pluginName ? ` · ${pluginName}` : ""} · {tokenDisplay} description tokens</Text></Box>;
+  return <Box key={`${skill_0.name}-${skill_0.source}`}><Text>{getCommandName(skill_0)}</Text><Text dimColor={true}>{pluginName ? ` · ${pluginName}` : ""} · {tokenDisplay} tokens {skill_0.description}</Text></Box>;
 }
 function _temp2(a, b) {
   return getCommandName(a).localeCompare(getCommandName(b));
