@@ -4,6 +4,9 @@ import { useTerminalSize } from '../../hooks/useTerminalSize.js';
 import { stringWidth } from '../../ink/stringWidth.js';
 import { Ansi, Text } from '../../ink.js';
 import type { Theme } from '../../utils/theme.js';
+
+const isNui = !!process.env.CLAUDE_CODE_NUI;
+const isMinimal = !!process.env.CLAUDE_CODE_MINIMAL;
 type DividerProps = {
   /**
    * Width of the divider in characters.
@@ -64,6 +67,10 @@ type DividerProps = {
  * <Divider title="3 new messages" />
  */
 export function Divider(t0) {
+  // nui 或极简模式下隐藏分隔线
+  if (isNui || isMinimal) {
+    return null;
+  }
   const $ = _c(21);
   const {
     width,
