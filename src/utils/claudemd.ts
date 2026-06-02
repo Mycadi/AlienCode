@@ -1,10 +1,10 @@
 /**
  * Files are loaded in the following order:
  *
- * 1. Managed memory (eg. /etc/claude-code/CLAUDE.md) - Global instructions for all users
- * 2. User memory (~/.claude/CLAUDE.md) - Private global instructions for all projects
- * 3. Project memory (root AGENTS.md, .claude/CLAUDE.md, and .claude/rules/*.md in project roots) - Instructions checked into the codebase
- * 4. Local memory (CLAUDE.local.md in project roots) - Private project-specific instructions
+ * 1. Managed memory (eg. /etc/claude-code/ACODE.md) - Global instructions for all users
+ * 2. User memory (~/.claude/ACODE.md) - Private global instructions for all projects
+ * 3. Project memory (root ACODE.md, root AGENTS.md, and .claude/rules/*.md in project roots) - Instructions checked into the codebase
+ * 4. Local memory (ACODE.local.md in project roots) - Private project-specific instructions
  *
  * Files are loaded in reverse order of priority, i.e. the latest files are highest priority
  * with the model paying more attention to them.
@@ -13,7 +13,7 @@
  * - User memory is loaded from the user's home directory
  * - Project and Local files are discovered by traversing from the current directory up to root
  * - Files closer to the current directory have higher priority (loaded later)
- * - The project root AGENTS.md, .claude/CLAUDE.md, and all .md files in .claude/rules/ are checked for Project memory
+ * - The project root ACODE.md, root AGENTS.md, and all .md files in .claude/rules/ are checked for Project memory
  *
  * Memory @include directive:
  * - Memory files can include other files using @ notation
@@ -243,30 +243,35 @@ export type MemoryFileInfo = {
   rawContent?: string
 }
 
-export const PROJECT_MEMORY_BASENAME = 'AGENTS.md'
+export const PROJECT_MEMORY_BASENAMES = ['ACODE.md', 'AGENTS.md'] as const
 
 function isProjectMemoryBasename(fileName: string): boolean {
-  return fileName.toLowerCase() === PROJECT_MEMORY_BASENAME.toLowerCase()
+  return PROJECT_MEMORY_BASENAMES.some(
+    basename => fileName.toLowerCase() === basename.toLowerCase(),
+  )
 }
 
-export async function findProjectMemoryFile(
-  dir: string,
-): Promise<string | null> {
+export async function findProjectMemoryFiles(dir: string): Promise<string[]> {
   const fs = getFsImplementation()
   try {
     const entries = await fs.readdir(dir)
-    const match = entries.find(
-      entry => !entry.isDirectory() && isProjectMemoryBasename(entry.name),
+    return PROJECT_MEMORY_BASENAMES.map(fileName =>
+      entries.find(
+        entry =>
+          !entry.isDirectory() &&
+          entry.name.toLowerCase() === fileName.toLowerCase(),
+      ),
     )
-    return match ? join(dir, match.name) : null
+      .filter(entry => entry !== undefined)
+      .map(entry => join(dir, entry.name))
   } catch (error) {
     handleMemoryFileReadError(error, dir)
-    return null
+    return []
   }
 }
 
 export function getDefaultProjectMemoryPath(dir?: string): string {
-  return join(dir ?? getProjectMemoryDirectory(), PROJECT_MEMORY_BASENAME)
+  return join(dir ?? getProjectMemoryDirectory(), PROJECT_MEMORY_BASENAMES[0])
 }
 
 function isProjectMemoryPath(filePath: string): boolean {
@@ -602,7 +607,7 @@ function isClaudeMdExcluded(filePath: string, type: MemoryType): boolean {
 
   // Build an expanded pattern list that includes realpath-resolved versions of
   // absolute patterns. This handles symlinks like /tmp -> /private/tmp on macOS:
-  // the user writes "/tmp/project/CLAUDE.md" in their exclude, but the system
+  // the user writes "/tmp/project/ACODE.md" in their exclude, but the system
   // resolves the CWD to "/private/tmp/project/...", so the file path uses the
   // real path. By resolving the patterns too, both sides match.
   const expandedPatterns = resolveExcludePatterns(patterns).filter(
@@ -905,7 +910,7 @@ export const getMemoryFiles = memoize(
     // checked-in files like root AGENTS.md and .claude/rules/*.md, so the same
     // content gets loaded twice. Skip Project-type (checked-in) files from
     // directories above the worktree but within the main repo — the worktree
-    // already has its own checkout. CLAUDE.local.md is gitignored so it only
+    // already has its own checkout. ACODE.local.md is gitignored so it only
     // exists in the main repo and is still loaded.
     // See: https://github.com/anthropics/claude-code/issues/29599
     const gitRoot = findGitRoot(originalCwd)
@@ -927,11 +932,10 @@ export const getMemoryFiles = memoize(
         pathInWorkingPath(dir, canonicalRoot) &&
         !pathInWorkingPath(dir, gitRoot)
 
-      // Try reading the root AGENTS.md variant (Project) - only if projectSettings is enabled
+      // Try reading root ACODE.md and AGENTS.md (Project) - only if projectSettings is enabled
       if (isSettingSourceEnabled('projectSettings') && !skipProject) {
         if (normalizePathForComparison(dir) === normalizePathForComparison(projectMemoryDir)) {
-          const projectPath = await findProjectMemoryFile(dir)
-          if (projectPath) {
+          for (const projectPath of await findProjectMemoryFiles(dir)) {
             result.push(
               ...(await processMemoryFile(
                 projectPath,
@@ -942,17 +946,6 @@ export const getMemoryFiles = memoize(
             )
           }
         }
-
-        // Try reading .claude/CLAUDE.md (Project)
-        const dotClaudePath = join(dir, '.claude', 'CLAUDE.md')
-        result.push(
-          ...(await processMemoryFile(
-            dotClaudePath,
-            'Project',
-            processedPaths,
-            includeExternal,
-          )),
-        )
 
         // Try reading .claude/rules/*.md files (Project)
         const rulesDir = join(dir, '.claude', 'rules')
@@ -967,9 +960,9 @@ export const getMemoryFiles = memoize(
         )
       }
 
-      // Try reading CLAUDE.local.md (Local) - only if localSettings is enabled
+      // Try reading ACODE.local.md (Local) - only if localSettings is enabled
       if (isSettingSourceEnabled('localSettings')) {
-        const localPath = join(dir, 'CLAUDE.local.md')
+        const localPath = join(dir, 'ACODE.local.md')
         result.push(
           ...(await processMemoryFile(
             localPath,
@@ -981,16 +974,15 @@ export const getMemoryFiles = memoize(
       }
     }
 
-    // Process root AGENTS.md from additional directories (--add-dir) if env var is enabled
+    // Process root ACODE.md and AGENTS.md from additional directories (--add-dir) if env var is enabled
     // This is controlled by CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD and defaults to off
     // Note: we don't check isSettingSourceEnabled('projectSettings') here because --add-dir
     // is an explicit user action and the SDK defaults settingSources to [] when not specified
     if (isEnvTruthy(process.env.CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD)) {
       const additionalDirs = getAdditionalDirectoriesForClaudeMd()
       for (const dir of additionalDirs) {
-        // Try reading the root AGENTS.md variant from the additional directory
-        const projectPath = await findProjectMemoryFile(dir)
-        if (projectPath) {
+        // Try reading root ACODE.md and AGENTS.md variants from the additional directory
+        for (const projectPath of await findProjectMemoryFiles(dir)) {
           result.push(
             ...(await processMemoryFile(
               projectPath,
@@ -1000,17 +992,6 @@ export const getMemoryFiles = memoize(
             )),
           )
         }
-
-        // Try reading .claude/CLAUDE.md from the additional directory
-        const dotClaudePath = join(dir, '.claude', 'CLAUDE.md')
-        result.push(
-          ...(await processMemoryFile(
-            dotClaudePath,
-            'Project',
-            processedPaths,
-            includeExternal,
-          )),
-        )
 
         // Try reading .claude/rules/*.md files from the additional directory
         const rulesDir = join(dir, '.claude', 'rules')
@@ -1092,7 +1073,7 @@ export const getMemoryFiles = memoize(
     // Fire InstructionsLoaded hook for each instruction file loaded
     // (fire-and-forget, audit/observability only).
     // AutoMem/TeamMem are intentionally excluded — they're a separate
-    // memory system, not "instructions" in the CLAUDE.md/rules sense.
+    // memory system, not "instructions" in the ACODE.md/rules sense.
     // Gated on !forceIncludeExternal: the forceIncludeExternal=true variant
     // is only used by getExternalClaudeMdIncludes() for approval checks, not
     // for building context — firing the hook there would double-fire on startup.
@@ -1303,14 +1284,13 @@ export async function getMemoryFilesForNestedDirectory(
 ): Promise<MemoryFileInfo[]> {
   const result: MemoryFileInfo[] = []
 
-  // Process project memory files (root AGENTS.md variant and .claude/CLAUDE.md)
+  // Process project memory files (root ACODE.md and AGENTS.md)
   if (isSettingSourceEnabled('projectSettings')) {
     if (
       normalizePathForComparison(dir) ===
       normalizePathForComparison(getProjectMemoryDirectory())
     ) {
-      const projectPath = await findProjectMemoryFile(dir)
-      if (projectPath) {
+      for (const projectPath of await findProjectMemoryFiles(dir)) {
         result.push(
           ...(await processMemoryFile(
             projectPath,
@@ -1321,20 +1301,11 @@ export async function getMemoryFilesForNestedDirectory(
         )
       }
     }
-    const dotClaudePath = join(dir, '.claude', 'CLAUDE.md')
-    result.push(
-      ...(await processMemoryFile(
-        dotClaudePath,
-        'Project',
-        processedPaths,
-        false,
-      )),
-    )
   }
 
-  // Process local memory file (CLAUDE.local.md)
+  // Process local memory file (ACODE.local.md)
   if (isSettingSourceEnabled('localSettings')) {
-    const localPath = join(dir, 'CLAUDE.local.md')
+    const localPath = join(dir, 'ACODE.local.md')
     result.push(
       ...(await processMemoryFile(localPath, 'Local', processedPaths, false)),
     )
@@ -1487,13 +1458,13 @@ export async function shouldShowClaudeMdExternalIncludesWarning(): Promise<boole
 }
 
 /**
- * Check if a file path is a memory file (root AGENTS.md, CLAUDE.local.md, or .claude/rules/*.md)
+ * Check if a file path is a memory file (root ACODE.md, root AGENTS.md, ACODE.local.md, or .claude/rules/*.md)
  */
 export function isMemoryFilePath(filePath: string): boolean {
   const name = basename(filePath)
 
-  // Root AGENTS.md variant or CLAUDE.local.md anywhere
-  if (isProjectMemoryPath(filePath) || name === 'CLAUDE.local.md') {
+  // Root ACODE.md/AGENTS.md variant or ACODE.local.md anywhere
+  if (isProjectMemoryPath(filePath) || name === 'ACODE.local.md') {
     return true
   }
 

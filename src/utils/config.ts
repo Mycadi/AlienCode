@@ -1804,13 +1804,13 @@ export function recordFirstStartTime(): void {
 export function getMemoryPath(memoryType: MemoryType): string {
   switch (memoryType) {
     case 'User':
-      return join(getClaudeConfigHomeDir(), 'CLAUDE.md')
+      return join(getClaudeConfigHomeDir(), 'ACODE.md')
     case 'Local':
-      return join(getOriginalCwd(), 'CLAUDE.local.md')
+      return join(getOriginalCwd(), 'ACODE.local.md')
     case 'Project':
-      return join(getProjectMemoryDirectory(), 'AGENTS.md')
+      return join(getProjectMemoryDirectory(), 'ACODE.md')
     case 'Managed':
-      return join(getManagedFilePath(), 'CLAUDE.md')
+      return join(getManagedFilePath(), 'ACODE.md')
     case 'AutoMem':
       return getAutoMemEntrypoint()
   }
