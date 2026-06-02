@@ -1255,7 +1255,7 @@ export function REPL({
   }
   // Alien Agent status for external program consumption via terminal title
   if (alienAgentProject) {
-    const alienAgentStatus: string = isLoading ? 'working' : 'input';
+    const alienAgentStatus: string = isLoading && !isWaitingForApproval && !isShowingLocalJSXCommand ? 'working' : 'input';
     terminalTitle = `${basename(alienAgentProject)} · AAV:${alienAgentSessionId}:${alienAgentStatus}`;
   }
   const [cursor, setCursor] = useState<MessageActionsState | null>(null);
