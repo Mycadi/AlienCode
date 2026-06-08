@@ -30,7 +30,7 @@ export function modelSupportsEffort(model: string): boolean {
     return supported3P
   }
   // Supported by a subset of Claude 4 models
-  if (m.includes('opus-4-6') || m.includes('sonnet-4-6')) {
+  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {
     return true
   }
   // Exclude any other known legacy models (haiku, older opus/sonnet variants)
@@ -55,7 +55,7 @@ export function modelSupportsMaxEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (model.toLowerCase().includes('opus-4-6')) {
+  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8')) {
     return true
   }
   if (process.env.USER_TYPE === 'ant' && resolveAntModel(model)) {
@@ -230,7 +230,7 @@ export function getEffortLevelDescription(level: EffortLevel): string {
     case 'high':
       return 'Comprehensive implementation with extensive testing and documentation'
     case 'max':
-      return 'Maximum capability with deepest reasoning (Opus 4.6 only)'
+      return 'Maximum capability with deepest reasoning (Opus 4.8 only)'
   }
 }
 
@@ -306,7 +306,7 @@ export function getDefaultEffortForModel(
 
   // Default effort on Opus 4.6 to medium for Pro.
   // Max/Team also get medium when the tengu_grey_step2 config is enabled.
-  if (model.toLowerCase().includes('opus-4-6')) {
+  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8')) {
     if (isProSubscriber()) {
       return 'medium'
     }

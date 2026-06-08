@@ -163,8 +163,20 @@ function get3PFallbackSuggestion(model: string): string | undefined {
     return undefined
   }
   const lowerModel = model.toLowerCase()
+  if (lowerModel.includes('opus-4-8') || lowerModel.includes('opus_4_8')) {
+    return getModelStrings().opus46
+  }
+  if (lowerModel.includes('opus-4-7') || lowerModel.includes('opus_4_7')) {
+    return getModelStrings().opus46
+  }
   if (lowerModel.includes('opus-4-6') || lowerModel.includes('opus_4_6')) {
     return getModelStrings().opus41
+  }
+  if (lowerModel.includes('sonnet-4-8') || lowerModel.includes('sonnet_4_8')) {
+    return getModelStrings().sonnet46
+  }
+  if (lowerModel.includes('sonnet-4-7') || lowerModel.includes('sonnet_4_7')) {
+    return getModelStrings().sonnet46
   }
   if (lowerModel.includes('sonnet-4-6') || lowerModel.includes('sonnet_4_6')) {
     return getModelStrings().sonnet45

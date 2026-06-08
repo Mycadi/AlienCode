@@ -86,12 +86,44 @@ export const CLAUDE_OPUS_4_6_CONFIG = {
   openai: 'claude-opus-4-6',
 } as const satisfies ModelConfig
 
+export const CLAUDE_OPUS_4_7_CONFIG = {
+  firstParty: 'claude-opus-4-7',
+  bedrock: 'us.anthropic.claude-opus-4-7-v1',
+  vertex: 'claude-opus-4-7',
+  foundry: 'claude-opus-4-7',
+  openai: 'claude-opus-4-7',
+} as const satisfies ModelConfig
+
+export const CLAUDE_OPUS_4_8_CONFIG = {
+  firstParty: 'claude-opus-4-8',
+  bedrock: 'us.anthropic.claude-opus-4-8-v1',
+  vertex: 'claude-opus-4-8',
+  foundry: 'claude-opus-4-8',
+  openai: 'claude-opus-4-8',
+} as const satisfies ModelConfig
+
 export const CLAUDE_SONNET_4_6_CONFIG = {
   firstParty: 'claude-sonnet-4-6',
   bedrock: 'us.anthropic.claude-sonnet-4-6',
   vertex: 'claude-sonnet-4-6',
   foundry: 'claude-sonnet-4-6',
   openai: 'claude-sonnet-4-6',
+} as const satisfies ModelConfig
+
+export const CLAUDE_SONNET_4_7_CONFIG = {
+  firstParty: 'claude-sonnet-4-7',
+  bedrock: 'us.anthropic.claude-sonnet-4-7',
+  vertex: 'claude-sonnet-4-7',
+  foundry: 'claude-sonnet-4-7',
+  openai: 'claude-sonnet-4-7',
+} as const satisfies ModelConfig
+
+export const CLAUDE_SONNET_4_8_CONFIG = {
+  firstParty: 'claude-sonnet-4-8',
+  bedrock: 'us.anthropic.claude-sonnet-4-8',
+  vertex: 'claude-sonnet-4-8',
+  foundry: 'claude-sonnet-4-8',
+  openai: 'claude-sonnet-4-8',
 } as const satisfies ModelConfig
 
 // OpenAI Codex models
@@ -136,10 +168,14 @@ export const ALL_MODEL_CONFIGS = {
   sonnet40: CLAUDE_SONNET_4_CONFIG,
   sonnet45: CLAUDE_SONNET_4_5_CONFIG,
   sonnet46: CLAUDE_SONNET_4_6_CONFIG,
+  sonnet47: CLAUDE_SONNET_4_7_CONFIG,
+  sonnet48: CLAUDE_SONNET_4_8_CONFIG,
   opus40: CLAUDE_OPUS_4_CONFIG,
   opus41: CLAUDE_OPUS_4_1_CONFIG,
   opus45: CLAUDE_OPUS_4_5_CONFIG,
   opus46: CLAUDE_OPUS_4_6_CONFIG,
+  opus47: CLAUDE_OPUS_4_7_CONFIG,
+  opus48: CLAUDE_OPUS_4_8_CONFIG,
   // OpenAI Codex models
   gpt55: GPT_5_5_CONFIG,
   gpt54: GPT_5_4_CONFIG,

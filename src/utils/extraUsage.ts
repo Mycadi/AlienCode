@@ -14,10 +14,10 @@ export function isBilledAsExtraUsage(
     .toLowerCase()
     .replace(/\[1m\]$/, '')
     .trim()
-  const isOpus46 = m === 'opus' || m.includes('opus-4-6')
-  const isSonnet46 = m === 'sonnet' || m.includes('sonnet-4-6')
+  const isOpus46Plus = m === 'opus' || m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8')
+  const isSonnet46Plus = m === 'sonnet' || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')
 
-  if (isOpus46 && isOpus1mMerged) return false
+  if (isOpus46Plus && isOpus1mMerged) return false
 
-  return isOpus46 || isSonnet46
+  return isOpus46Plus || isSonnet46Plus
 }

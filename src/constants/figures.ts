@@ -12,7 +12,7 @@ export const LIGHTNING_BOLT = isNui ? '~' : '↯' // used for fast mode indicato
 export const EFFORT_LOW = isNui ? 'o' : '○' // effort level: low
 export const EFFORT_MEDIUM = isNui ? 'o' : '◐' // effort level: medium
 export const EFFORT_HIGH = isNui ? 'o' : '●' // effort level: high
-export const EFFORT_MAX = isNui ? 'o' : '◉' // effort level: max (Opus 4.6 only)
+export const EFFORT_MAX = isNui ? 'o' : '◉' // effort level: max (Opus 4.8 only)
 
 // Media/trigger status indicators
 export const PLAY_ICON = isNui ? '>' : '\u25b6' // ▶

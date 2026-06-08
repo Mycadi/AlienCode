@@ -22,7 +22,7 @@ import {
 } from '../context.js'
 import { isEnvTruthy } from '../envUtils.js'
 import { getModelStrings, resolveOverriddenModel } from './modelStrings.js'
-import { formatModelPricing, getOpus46CostTier } from '../modelCost.js'
+import { formatModelPricing, getOpus48CostTier } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import type { PermissionMode } from '../permissions/PermissionMode.js'
 import { getAPIProvider } from './providers.js'
@@ -45,7 +45,9 @@ export function isNonCustomOpusModel(model: ModelName): boolean {
     model === getModelStrings().opus40 ||
     model === getModelStrings().opus41 ||
     model === getModelStrings().opus45 ||
-    model === getModelStrings().opus46
+    model === getModelStrings().opus46 ||
+    model === getModelStrings().opus47 ||
+    model === getModelStrings().opus48
   )
 }
 
@@ -115,7 +117,7 @@ export function getDefaultOpusModel(): ModelName {
   if (getAPIProvider() !== 'firstParty') {
     return getModelStrings().opus46
   }
-  return getModelStrings().opus46
+  return getModelStrings().opus48
 }
 
 // @[MODEL LAUNCH]: Update the default Sonnet model (3P providers may lag so keep defaults unchanged).
@@ -123,11 +125,11 @@ export function getDefaultSonnetModel(): ModelName {
   if (process.env.ANTHROPIC_DEFAULT_SONNET_MODEL) {
     return process.env.ANTHROPIC_DEFAULT_SONNET_MODEL
   }
-  // Default to Sonnet 4.5 for 3P since they may not have 4.6 yet
+  // Default to Sonnet 4.5 for 3P since they may not have 4.8 yet
   if (getAPIProvider() !== 'firstParty') {
     return getModelStrings().sonnet45
   }
-  return getModelStrings().sonnet46
+  return getModelStrings().sonnet48
 }
 
 // @[MODEL LAUNCH]: Update the default Haiku model (3P providers may lag so keep defaults unchanged).
@@ -174,7 +176,7 @@ export function getRuntimeMainLoopModel(params: {
  *
  * This handles the built-in default:
  * - Opus for Max and Team Premium users
- * - Sonnet 4.6 for all other users (including Team Standard, Pro, Enterprise)
+ * - Sonnet 4.8 for all other users (including Team Standard, Pro, Enterprise)
  *
  * @returns The default model setting to use
  */
@@ -241,7 +243,13 @@ export function getDefaultMainLoopModel(): ModelName {
 export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   name = name.toLowerCase()
   // Special cases for Claude 4+ models to differentiate versions
-  // Order matters: check more specific versions first (4-5 before 4)
+  // Order matters: check more specific versions first (4-8 before 4-7 before 4-6 etc.)
+  if (name.includes('claude-opus-4-8')) {
+    return 'claude-opus-4-8'
+  }
+  if (name.includes('claude-opus-4-7')) {
+    return 'claude-opus-4-7'
+  }
   if (name.includes('claude-opus-4-6')) {
     return 'claude-opus-4-6'
   }
@@ -253,6 +261,12 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   }
   if (name.includes('claude-opus-4')) {
     return 'claude-opus-4'
+  }
+  if (name.includes('claude-sonnet-4-8')) {
+    return 'claude-sonnet-4-8'
+  }
+  if (name.includes('claude-sonnet-4-7')) {
+    return 'claude-sonnet-4-7'
   }
   if (name.includes('claude-sonnet-4-6')) {
     return 'claude-sonnet-4-6'
@@ -328,25 +342,25 @@ export function getClaudeAiUserDefaultModelDescription(
   }
   if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
     if (isOpus1mMergeEnabled()) {
-      return `Opus 4.6 with 1M context · Most capable for complex work${fastMode ? getOpus46PricingSuffix(true) : ''}`
+      return `Opus 4.8 with 1M context · Most capable for complex work${fastMode ? getOpus48PricingSuffix(true) : ''}`
     }
-    return `Opus 4.6 · Most capable for complex work${fastMode ? getOpus46PricingSuffix(true) : ''}`
+    return `Opus 4.8 · Most capable for complex work${fastMode ? getOpus48PricingSuffix(true) : ''}`
   }
-  return 'Sonnet 4.6 · Best for everyday tasks'
+  return 'Sonnet 4.8 · Best for everyday tasks'
 }
 
 export function renderDefaultModelSetting(
   setting: ModelName | ModelAlias,
 ): string {
   if (setting === 'opusplan') {
-    return 'Opus 4.6 in plan mode, else Sonnet 4.6'
+    return 'Opus 4.8 in plan mode, else Sonnet 4.8'
   }
   return renderModelName(parseUserSpecifiedModel(setting))
 }
 
-export function getOpus46PricingSuffix(fastMode: boolean): string {
+export function getOpus48PricingSuffix(fastMode: boolean): string {
   if (getAPIProvider() !== 'firstParty') return ''
-  const pricing = formatModelPricing(getOpus46CostTier(fastMode))
+  const pricing = formatModelPricing(getOpus48CostTier(fastMode))
   const fastModeIndicator = fastMode ? ` (${LIGHTNING_BOLT})` : ''
   return ` ·${fastModeIndicator} ${pricing}`
 }
@@ -408,6 +422,14 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
   }
 
   switch (model) {
+    case getModelStrings().opus48:
+      return 'Opus 4.8'
+    case getModelStrings().opus48 + '[1m]':
+      return 'Opus 4.8 (1M context)'
+    case getModelStrings().opus47:
+      return 'Opus 4.7'
+    case getModelStrings().opus47 + '[1m]':
+      return 'Opus 4.7 (1M context)'
     case getModelStrings().opus46:
       return 'Opus 4.6'
     case getModelStrings().opus46 + '[1m]':
@@ -418,6 +440,14 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
       return 'Opus 4.1'
     case getModelStrings().opus40:
       return 'Opus 4'
+    case getModelStrings().sonnet48 + '[1m]':
+      return 'Sonnet 4.8 (1M context)'
+    case getModelStrings().sonnet48:
+      return 'Sonnet 4.8'
+    case getModelStrings().sonnet47 + '[1m]':
+      return 'Sonnet 4.7 (1M context)'
+    case getModelStrings().sonnet47:
+      return 'Sonnet 4.7'
     case getModelStrings().sonnet46 + '[1m]':
       return 'Sonnet 4.6 (1M context)'
     case getModelStrings().sonnet46:
@@ -657,6 +687,12 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
       return 'Ring 2.6 1T Free'
   }
 
+  if (canonical.includes('claude-opus-4-8')) {
+    return has1m ? 'Opus 4.8 (with 1M context)' : 'Opus 4.8'
+  }
+  if (canonical.includes('claude-opus-4-7')) {
+    return has1m ? 'Opus 4.7 (with 1M context)' : 'Opus 4.7'
+  }
   if (canonical.includes('claude-opus-4-6')) {
     return has1m ? 'Opus 4.6 (with 1M context)' : 'Opus 4.6'
   }
@@ -668,6 +704,12 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   }
   if (canonical.includes('claude-opus-4')) {
     return 'Opus 4'
+  }
+  if (canonical.includes('claude-sonnet-4-8')) {
+    return has1m ? 'Sonnet 4.8 (with 1M context)' : 'Sonnet 4.8'
+  }
+  if (canonical.includes('claude-sonnet-4-7')) {
+    return has1m ? 'Sonnet 4.7 (with 1M context)' : 'Sonnet 4.7'
   }
   if (canonical.includes('claude-sonnet-4-6')) {
     return has1m ? 'Sonnet 4.6 (with 1M context)' : 'Sonnet 4.6'

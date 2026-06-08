@@ -11,9 +11,13 @@ import {
   CLAUDE_OPUS_4_1_CONFIG,
   CLAUDE_OPUS_4_5_CONFIG,
   CLAUDE_OPUS_4_6_CONFIG,
+  CLAUDE_OPUS_4_7_CONFIG,
+  CLAUDE_OPUS_4_8_CONFIG,
   CLAUDE_OPUS_4_CONFIG,
   CLAUDE_SONNET_4_5_CONFIG,
   CLAUDE_SONNET_4_6_CONFIG,
+  CLAUDE_SONNET_4_7_CONFIG,
+  CLAUDE_SONNET_4_8_CONFIG,
   CLAUDE_SONNET_4_CONFIG,
 } from './model/configs.js'
 import {
@@ -89,9 +93,9 @@ export const COST_HAIKU_45 = {
 const DEFAULT_UNKNOWN_MODEL_COST = COST_TIER_5_25
 
 /**
- * Get the cost tier for Opus 4.6 based on fast mode.
+ * Get the cost tier for Opus 4.8 based on fast mode.
  */
-export function getOpus46CostTier(fastMode: boolean): ModelCosts {
+export function getOpus48CostTier(fastMode: boolean): ModelCosts {
   if (isFastModeEnabled() && fastMode) {
     return COST_TIER_30_150
   }
@@ -116,12 +120,20 @@ export const MODEL_COSTS: Record<ModelShortName, ModelCosts> = {
     COST_TIER_3_15,
   [firstPartyNameToCanonical(CLAUDE_SONNET_4_6_CONFIG.firstParty)]:
     COST_TIER_3_15,
+  [firstPartyNameToCanonical(CLAUDE_SONNET_4_7_CONFIG.firstParty)]:
+    COST_TIER_3_15,
+  [firstPartyNameToCanonical(CLAUDE_SONNET_4_8_CONFIG.firstParty)]:
+    COST_TIER_3_15,
   [firstPartyNameToCanonical(CLAUDE_OPUS_4_CONFIG.firstParty)]: COST_TIER_15_75,
   [firstPartyNameToCanonical(CLAUDE_OPUS_4_1_CONFIG.firstParty)]:
     COST_TIER_15_75,
   [firstPartyNameToCanonical(CLAUDE_OPUS_4_5_CONFIG.firstParty)]:
     COST_TIER_5_25,
   [firstPartyNameToCanonical(CLAUDE_OPUS_4_6_CONFIG.firstParty)]:
+    COST_TIER_5_25,
+  [firstPartyNameToCanonical(CLAUDE_OPUS_4_7_CONFIG.firstParty)]:
+    COST_TIER_5_25,
+  [firstPartyNameToCanonical(CLAUDE_OPUS_4_8_CONFIG.firstParty)]:
     COST_TIER_5_25,
 }
 
@@ -144,12 +156,14 @@ function tokensToUSDCost(modelCosts: ModelCosts, usage: Usage): number {
 export function getModelCosts(model: string, usage: Usage): ModelCosts {
   const shortName = getCanonicalName(model)
 
-  // Check if this is an Opus 4.6 model with fast mode active.
+  // Check if this is an Opus 4.6+ model with fast mode active.
   if (
-    shortName === firstPartyNameToCanonical(CLAUDE_OPUS_4_6_CONFIG.firstParty)
+    shortName === firstPartyNameToCanonical(CLAUDE_OPUS_4_6_CONFIG.firstParty) ||
+    shortName === firstPartyNameToCanonical(CLAUDE_OPUS_4_7_CONFIG.firstParty) ||
+    shortName === firstPartyNameToCanonical(CLAUDE_OPUS_4_8_CONFIG.firstParty)
   ) {
     const isFastMode = usage.speed === 'fast'
-    return getOpus46CostTier(isFastMode)
+    return getOpus48CostTier(isFastMode)
   }
 
   const costs = MODEL_COSTS[shortName]
