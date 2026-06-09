@@ -30,6 +30,10 @@ import { LINK_END, link as oscLink } from './termio/osc.js'
 
 type State = {
   previousOutput: string
+  // Legacy Windows (old conhost) full-repaint path: number of lines the
+  // previous frame occupied. Used to erase exactly those lines (CSI 2K +
+  // cursor-up) instead of clearing the whole screen, which avoids flicker.
+  legacyPrevLineCount: number
 }
 
 type Options = {
@@ -54,6 +58,7 @@ export class LogUpdate {
   constructor(private readonly options: Options) {
     this.state = {
       previousOutput: '',
+      legacyPrevLineCount: 0,
     }
   }
 
@@ -68,6 +73,7 @@ export class LogUpdate {
   // Called when process resumes from suspension (SIGCONT) to prevent clobbering terminal content
   reset(): void {
     this.state.previousOutput = ''
+    this.state.legacyPrevLineCount = 0
   }
 
   private renderFullFrame(frame: Frame): Diff {
@@ -142,10 +148,34 @@ export class LogUpdate {
     const stylePool = this.options.stylePool
 
     if (isLegacyWindowsMinimal()) {
-      return [
-        { type: 'clearTerminal', reason: 'clear' },
-        ...this.renderFullFrame(next),
-      ]
+      // Old conhost (Win10 1607-era, non-Windows-Terminal) can't parse the
+      // DEC 2026 synchronized-output markers used to hide redraws, so the
+      // previous approach cleared the WHOLE screen (CSI 2J) every frame and
+      // repainted — producing a visible blank→content flash on each frame.
+      // During streaming edits (high frame rate) this reads as constant
+      // flicker.
+      //
+      // Instead, erase only the lines the previous frame occupied via
+      // eraseLines (CSI 2K per line + cursor-up), leaving the cursor at the
+      // top of the content region, then repaint in place. No whole-screen
+      // erase means no blank flash. We still fully repaint (rather than
+      // diffing) to avoid old conhost's relative-cursor quirks.
+      const fullFrame = this.renderFullFrame(next)
+      const firstPatch = fullFrame[0]
+      const content =
+        firstPatch && firstPatch.type === 'stdout' ? firstPatch.content : ''
+      const lineCount = content === '' ? 0 : content.split('\n').length
+      const clearCount = this.state.legacyPrevLineCount
+      this.state.legacyPrevLineCount = lineCount
+
+      const diff: Diff = []
+      if (clearCount > 0) {
+        diff.push({ type: 'clear', count: clearCount })
+      }
+      if (content !== '') {
+        diff.push({ type: 'stdout', content })
+      }
+      return diff
     }
 
     // Since we assume the cursor is at the bottom on the screen, we only need
