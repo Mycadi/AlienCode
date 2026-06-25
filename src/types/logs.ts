@@ -51,6 +51,7 @@ export type LogOption = {
   worktreeSession?: PersistedWorktreeSession | null // Worktree state at session end (null = exited, undefined = never entered)
   contentReplacements?: ContentReplacementRecord[] // Replacement decisions for resume reconstruction
   goal?: { goalText: string; maxTurns?: number; maxMinutes?: number } // Active goal at session end
+  loop?: { taskText: string; intervalMinutes: number } // Active loop at session end
 }
 
 export type SummaryMessage = {
@@ -128,6 +129,13 @@ export type GoalMessage = {
   goalText: string
   maxTurns?: number
   maxMinutes?: number
+}
+
+export type LoopMessage = {
+  type: 'loop'
+  sessionId: UUID
+  taskText: string
+  intervalMinutes: number
 }
 
 /**
@@ -325,6 +333,7 @@ export type Entry =
   | ContextCollapseCommitEntry
   | ContextCollapseSnapshotEntry
   | GoalMessage
+  | LoopMessage
 
 export function sortLogs(logs: LogOption[]): LogOption[] {
   return logs.sort((a, b) => {

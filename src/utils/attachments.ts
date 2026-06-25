@@ -720,6 +720,11 @@ export type Attachment =
       goalText: string
       progress: string
     }
+  | {
+      type: 'loop_reminder'
+      taskText: string
+      progress: string
+    }
 
 export type TeammateMailboxAttachment = {
   type: 'teammate_mailbox'
@@ -926,6 +931,9 @@ export async function getAttachments(
     ),
     maybe('goal_reminder', () =>
       Promise.resolve(getGoalReminderAttachment()),
+    ),
+    maybe('loop_reminder', () =>
+      Promise.resolve(getLoopReminderAttachment()),
     ),
     ...(feature('COMPACTION_REMINDERS')
       ? [
@@ -1621,6 +1629,19 @@ function getGoalReminderAttachment(): Attachment[] {
   const progress = parts.join(' ')
 
   return [{ type: 'goal_reminder', goalText: goal.goalText, progress }]
+}
+
+function getLoopReminderAttachment(): Attachment[] {
+  const { getLoop } = require('../commands/loop/loopState.js') as typeof import('../commands/loop/loopState.js')
+  const loop = getLoop()
+  if (!loop || loop.isStopped) {
+    return []
+  }
+
+  const elapsed = Math.round((Date.now() - loop.startTime) / 60_000)
+  const progress = `Iteration ${loop.iterationsCompleted + 1} | Every ${loop.intervalMinutes} min | Running for ${elapsed} min`
+
+  return [{ type: 'loop_reminder', taskText: loop.taskText, progress }]
 }
 
 function getOutputStyleAttachment(): Attachment[] {

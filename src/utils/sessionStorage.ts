@@ -546,6 +546,7 @@ class Project {
   currentSessionPrUrl: string | undefined
   currentSessionPrRepository: string | undefined
   currentSessionGoal: { goalText: string; maxTurns?: number; maxMinutes?: number } | undefined
+  currentSessionLoop: { taskText: string; intervalMinutes: number } | undefined
 
   sessionFile: string | null = null
   // Entries buffered while sessionFile is null. Flushed by materializeSessionFile
@@ -843,6 +844,14 @@ class Project {
         goalText: this.currentSessionGoal.goalText,
         maxTurns: this.currentSessionGoal.maxTurns,
         maxMinutes: this.currentSessionGoal.maxMinutes,
+        sessionId,
+      })
+    }
+    if (this.currentSessionLoop) {
+      appendEntryToFile(this.sessionFile, {
+        type: 'loop',
+        taskText: this.currentSessionLoop.taskText,
+        intervalMinutes: this.currentSessionLoop.intervalMinutes,
         sessionId,
       })
     }
@@ -1207,6 +1216,9 @@ class Project {
       void this.enqueueWrite(sessionFile, entry)
     } else if (entry.type === 'goal') {
       // Goal entries can always be appended
+      void this.enqueueWrite(sessionFile, entry)
+    } else if (entry.type === 'loop') {
+      // Loop entries can always be appended
       void this.enqueueWrite(sessionFile, entry)
     } else if (entry.type === 'worktree-state') {
       void this.enqueueWrite(sessionFile, entry)
@@ -2816,6 +2828,7 @@ export function clearSessionMetadata(): void {
   project.currentSessionPrUrl = undefined
   project.currentSessionPrRepository = undefined
   project.currentSessionGoal = undefined
+  project.currentSessionLoop = undefined
 }
 
 /**
@@ -2889,6 +2902,29 @@ export function saveGoal(
 export function clearSavedGoal(sessionId: UUID): void {
   if (sessionId === getSessionId()) {
     getProject().currentSessionGoal = undefined
+  }
+}
+
+export function saveLoop(
+  sessionId: UUID,
+  taskText: string,
+  intervalMinutes: number,
+): void {
+  const resolvedPath = getTranscriptPathForSession(sessionId)
+  appendEntryToFile(resolvedPath, {
+    type: 'loop',
+    taskText,
+    intervalMinutes,
+    sessionId,
+  })
+  if (sessionId === getSessionId()) {
+    getProject().currentSessionLoop = { taskText, intervalMinutes }
+  }
+}
+
+export function clearSavedLoop(sessionId: UUID): void {
+  if (sessionId === getSessionId()) {
+    getProject().currentSessionLoop = undefined
   }
 }
 
@@ -3054,6 +3090,7 @@ export async function loadFullLog(log: LogOption): Promise<LogOption> {
       agentSetting: sessionId ? agentSettings.get(sessionId) : log.agentSetting,
       mode: sessionId ? (modes.get(sessionId) as LogOption['mode']) : log.mode,
       goal: sessionId ? goals.get(sessionId) : log.goal,
+      loop: sessionId ? loops.get(sessionId) : log.loop,
       worktreeSession:
         sessionId && worktreeStates.has(sessionId)
           ? worktreeStates.get(sessionId)
@@ -3545,6 +3582,7 @@ export async function loadTranscriptFile(
   const prRepositories = new Map<UUID, string>()
   const modes = new Map<UUID, string>()
   const goals = new Map<UUID, { goalText: string; maxTurns?: number; maxMinutes?: number }>()
+  const loops = new Map<UUID, { taskText: string; intervalMinutes: number }>()
   const worktreeStates = new Map<UUID, PersistedWorktreeSession | null>()
   const fileHistorySnapshots = new Map<UUID, FileHistorySnapshotMessage>()
   const attributionSnapshots = new Map<UUID, AttributionSnapshotMessage>()
@@ -3644,6 +3682,8 @@ export async function loadTranscriptFile(
           modes.set(entry.sessionId, entry.mode)
         } else if (entry.type === 'goal' && entry.sessionId) {
           goals.set(entry.sessionId, { goalText: entry.goalText, maxTurns: entry.maxTurns, maxMinutes: entry.maxMinutes })
+        } else if (entry.type === 'loop' && entry.sessionId) {
+          loops.set(entry.sessionId, { taskText: entry.taskText, intervalMinutes: entry.intervalMinutes })
         } else if (entry.type === 'worktree-state' && entry.sessionId) {
           worktreeStates.set(entry.sessionId, entry.worktreeSession)
         } else if (entry.type === 'pr-link' && entry.sessionId) {
@@ -3714,6 +3754,8 @@ export async function loadTranscriptFile(
         modes.set(entry.sessionId, entry.mode)
       } else if (entry.type === 'goal' && entry.sessionId) {
         goals.set(entry.sessionId, { goalText: entry.goalText, maxTurns: entry.maxTurns, maxMinutes: entry.maxMinutes })
+      } else if (entry.type === 'loop' && entry.sessionId) {
+        loops.set(entry.sessionId, { taskText: entry.taskText, intervalMinutes: entry.intervalMinutes })
       } else if (entry.type === 'worktree-state' && entry.sessionId) {
         worktreeStates.set(entry.sessionId, entry.worktreeSession)
       } else if (entry.type === 'pr-link' && entry.sessionId) {
@@ -4719,6 +4761,7 @@ export async function loadAllLogsFromSessionFile(
       agentSetting: agentSettings.get(sessionId),
       mode: modes.get(sessionId) as LogOption['mode'],
       goal: goals.get(sessionId),
+      loop: loops.get(sessionId),
       prNumber: prNumbers.get(sessionId),
       prUrl: prUrls.get(sessionId),
       prRepository: prRepositories.get(sessionId),

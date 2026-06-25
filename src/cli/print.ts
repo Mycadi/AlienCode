@@ -598,6 +598,19 @@ export async function runHeadless(
     }
   }
 
+  // Handle /loop prefix in headless mode: parse and activate loop, then
+  // pass the task text as the actual prompt.
+  if (typeof inputPrompt === 'string' && inputPrompt.trimStart().startsWith('/loop ')) {
+    const { parseLoopArgs } = require('../commands/loop/loop.js') as typeof import('../commands/loop/loop.js')
+    const { setLoop } = require('../commands/loop/loopState.js') as typeof import('../commands/loop/loopState.js')
+    const loopArgs = inputPrompt.trimStart().slice('/loop '.length)
+    const parsed = parseLoopArgs(loopArgs)
+    if (parsed) {
+      setLoop(parsed.taskText, parsed.intervalMinutes)
+      inputPrompt = parsed.taskText
+    }
+  }
+
   const structuredIO = getStructuredIO(inputPrompt, options)
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
@@ -2300,6 +2313,46 @@ function runHeadlessStreaming(
                     }
                   }
                 }
+              }
+            }
+          }
+
+          // Loop tracking in headless mode
+          {
+            const { getLoop, incrementIteration, markLoopStopped } = require('../commands/loop/loopState.js') as typeof import('../commands/loop/loopState.js')
+            const loop = getLoop()
+            if (loop && !loop.isStopped) {
+              incrementIteration()
+              // Check if Claude declared loop done
+              const lastMsg = mutableMessages[mutableMessages.length - 1]
+              if (lastMsg?.role === 'assistant') {
+                const text = typeof lastMsg.content === 'string'
+                  ? lastMsg.content
+                  : Array.isArray(lastMsg.content)
+                    ? lastMsg.content
+                        .filter((b: { type: string }) => b.type === 'text')
+                        .map((b: { type: 'text'; text: string }) => b.text)
+                        .join('')
+                    : ''
+                if (/\*\*Loop done\.?\*\*/i.test(text)) {
+                  markLoopStopped('work_done')
+                }
+              }
+              // If still running, schedule next iteration
+              const updatedLoop = getLoop()
+              if (updatedLoop && !updatedLoop.isStopped && !inputClosed) {
+                setTimeout(() => {
+                  if (inputClosed) return
+                  const currentLoop = getLoop()
+                  if (!currentLoop || currentLoop.isStopped) return
+                  enqueue({
+                    mode: 'prompt' as const,
+                    value: `Continue the loop task: ${currentLoop.taskText}`,
+                    uuid: randomUUID(),
+                    priority: 'later',
+                  })
+                  void run()
+                }, updatedLoop.intervalMinutes * 60_000)
               }
             }
           }

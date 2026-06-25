@@ -3890,6 +3890,23 @@ You are working toward the goal above. Each turn:
         createUserMessage({ content, isMeta: true }),
       ])
     }
+    case 'loop_reminder': {
+      const content = `## Active Loop
+
+**Task:** ${attachment.taskText}
+**Progress:** ${attachment.progress}
+
+You are running in loop mode. Each iteration:
+1. Perform one round of the task above.
+2. At the end of your response, briefly report what you did this iteration.
+3. If all work is genuinely done and no further iterations are needed, state: "**Loop done.**"
+4. Otherwise, the next iteration will start automatically after the configured interval.
+5. Do NOT repeat work already completed in previous iterations.`
+
+      return wrapMessagesInSystemReminder([
+        createUserMessage({ content, isMeta: true }),
+      ])
+    }
     case 'mcp_resource': {
       // Format the resource content similar to how file attachments work
       const content = attachment.content

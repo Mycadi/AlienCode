@@ -876,6 +876,10 @@ export function REPL({
   // read in the onQuery finally block to notify mobile clients that a turn ended.
   const sendBridgeResultRef = useRef<() => void>(() => {});
 
+  // Ref for loop auto-trigger — set after onSubmit is defined,
+  // read in onQueryImpl to schedule the next loop iteration.
+  const loopTriggerRef = useRef<((taskText: string) => void) | null>(null);
+
   // Ref for the synchronous restore callback — set after restoreMessageSync is
   // defined, read in the onQuery finally block for auto-restore on interrupt.
   const restoreMessageSyncRef = useRef<(m: UserMessage) => void>(() => {});
@@ -1877,6 +1881,20 @@ export function REPL({
           restoreGoal(log.goal.goalText, { maxTurns: log.goal.maxTurns, maxMinutes: log.goal.maxMinutes });
         } else {
           clearGoal();
+        }
+      }
+
+      // Restore loop from the resumed session (iterationsCompleted and startTime reset)
+      {
+        const { clearLoop, restoreLoop, scheduleNextIteration } = require('../commands/loop/loopState.js') as typeof import('../commands/loop/loopState.js');
+        if (log.loop) {
+          restoreLoop(log.loop.taskText, log.loop.intervalMinutes);
+          // Schedule the first iteration after resume
+          scheduleNextIteration(() => {
+            loopTriggerRef.current?.(log.loop!.taskText);
+          });
+        } else {
+          clearLoop();
         }
       }
       // Resumed sessions shouldn't re-title from mid-conversation context
@@ -2911,6 +2929,40 @@ export function REPL({
         }
       }
     }
+
+    // Loop tracking: increment iteration and schedule next
+    {
+      const { getLoop, incrementIteration, markLoopStopped, scheduleNextIteration } = require('../commands/loop/loopState.js') as typeof import('../commands/loop/loopState.js');
+      const loop = getLoop();
+      if (loop && !loop.isStopped) {
+        incrementIteration();
+
+        // Check if Claude declared work done
+        const msgs = messagesRef.current;
+        const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+        if (lastAssistant) {
+          const text = typeof lastAssistant.content === 'string'
+            ? lastAssistant.content
+            : Array.isArray(lastAssistant.content)
+              ? lastAssistant.content
+                  .filter((b: { type: string }) => b.type === 'text')
+                  .map((b: { type: 'text'; text: string }) => b.text)
+                  .join('')
+              : '';
+          if (/\*\*Loop done\.?\*\*/i.test(text)) {
+            markLoopStopped('work_done');
+          }
+        }
+
+        // If still running, schedule next iteration
+        const currentLoop = getLoop();
+        if (currentLoop && !currentLoop.isStopped) {
+          scheduleNextIteration(() => {
+            loopTriggerRef.current?.(currentLoop.taskText);
+          });
+        }
+      }
+    }
   }, [initialMcpClients, resetLoadingState, getToolUseContext, toolPermissionContext, setAppState, customSystemPrompt, onTurnComplete, appendSystemPrompt, canUseTool, mainThreadAgentDefinition, onQueryEvent, sessionTitle, titleDisabled]);
   const onQuery = useCallback(async (newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, onBeforeQueryCallback?: (input: string, newMessages: MessageType[]) => Promise<boolean>, input?: string, effort?: EffortValue): Promise<void> => {
     // If this is a teammate, mark them as active when starting a turn
@@ -3672,6 +3724,15 @@ export function REPL({
   // old REPL scopes can be GC'd — saves ~35MB over a 1000-turn session.
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
+
+  // Wire loopTriggerRef to onSubmit so onQueryImpl can schedule loop iterations
+  loopTriggerRef.current = (taskText: string) => {
+    void onSubmitRef.current(`Continue the loop task: ${taskText}`, {
+      setCursorOffset: () => {},
+      clearBuffer: () => {},
+      resetHistory: () => {},
+    });
+  };
   const handleOpenRateLimitOptions = useCallback(() => {
     void onSubmitRef.current('/rate-limit-options', {
       setCursorOffset: () => {},
