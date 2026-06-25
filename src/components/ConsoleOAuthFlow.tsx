@@ -358,7 +358,7 @@ export function ConsoleOAuthFlow({
             </Box>
           </Box>}
       <Box paddingLeft={1} flexDirection="column" gap={1}>
-        <OAuthStatusMessage oauthStatus={oauthStatus} mode={mode} startingMessage={startingMessage} forcedMethodMessage={forcedMethodMessage} showPastePrompt={showPastePrompt} pastedCode={pastedCode} setPastedCode={setPastedCode} cursorOffset={cursorOffset} setCursorOffset={setCursorOffset} textInputColumns={textInputColumns} handleSubmitCode={handleSubmitCode} setOAuthStatus={setOAuthStatus} setLoginWithClaudeAi={setLoginWithClaudeAi} setLoginWithCodex={setLoginWithCodex} />
+        <OAuthStatusMessage oauthStatus={oauthStatus} mode={mode} startingMessage={startingMessage} forcedMethodMessage={forcedMethodMessage} showPastePrompt={showPastePrompt} pastedCode={pastedCode} setPastedCode={setPastedCode} cursorOffset={cursorOffset} setCursorOffset={setCursorOffset} textInputColumns={textInputColumns} handleSubmitCode={handleSubmitCode} setOAuthStatus={setOAuthStatus} setLoginWithClaudeAi={setLoginWithClaudeAi} setLoginWithCodex={setLoginWithCodex} loginWithClaudeAi={loginWithClaudeAi} loginWithCodex={loginWithCodex} />
       </Box>
     </Box>;
 }
@@ -377,9 +377,11 @@ type OAuthStatusMessageProps = {
   setOAuthStatus: (status: OAuthStatus) => void;
   setLoginWithClaudeAi: (value: boolean) => void;
   setLoginWithCodex: (value: boolean) => void;
+  loginWithClaudeAi: boolean;
+  loginWithCodex: boolean;
 };
 function OAuthStatusMessage(t0) {
-  const $ = _c(52);
+  const $ = _c(53);
   const {
     oauthStatus,
     mode,
@@ -394,7 +396,9 @@ function OAuthStatusMessage(t0) {
     handleSubmitCode,
     setOAuthStatus,
     setLoginWithClaudeAi,
-    setLoginWithCodex
+    setLoginWithCodex,
+    loginWithClaudeAi,
+    loginWithCodex
   } = t0;
   switch (oauthStatus.state) {
     case "idle":
@@ -628,42 +632,48 @@ function OAuthStatusMessage(t0) {
         } else {
           t1 = $[42];
         }
+        const availableModelsText = loginWithClaudeAi
+          ? "Available models: Opus, Sonnet, Haiku"
+          : loginWithCodex
+            ? "Available models: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.4 Mini"
+            : null;
         let t2;
-        if ($[43] !== t1) {
-          t2 = <Box flexDirection="column">{t1}</Box>;
+        if ($[43] !== t1 || $[44] !== availableModelsText) {
+          t2 = <Box flexDirection="column">{t1}{availableModelsText ? <Text dimColor={true}>{availableModelsText}</Text> : null}</Box>;
           $[43] = t1;
-          $[44] = t2;
+          $[44] = availableModelsText;
+          $[45] = t2;
         } else {
-          t2 = $[44];
+          t2 = $[45];
         }
         return t2;
       }
     case "error":
       {
         let t1;
-        if ($[45] !== oauthStatus.message) {
+        if ($[46] !== oauthStatus.message) {
           t1 = <Text color="error">OAuth error: {oauthStatus.message}</Text>;
-          $[45] = oauthStatus.message;
-          $[46] = t1;
+          $[46] = oauthStatus.message;
+          $[47] = t1;
         } else {
-          t1 = $[46];
+          t1 = $[47];
         }
         let t2;
-        if ($[47] !== oauthStatus.toRetry) {
+        if ($[48] !== oauthStatus.toRetry) {
           t2 = oauthStatus.toRetry && <Box marginTop={1}><Text color="permission">Press <Text bold={true}>Enter</Text> to retry.</Text></Box>;
-          $[47] = oauthStatus.toRetry;
-          $[48] = t2;
+          $[48] = oauthStatus.toRetry;
+          $[49] = t2;
         } else {
-          t2 = $[48];
+          t2 = $[49];
         }
         let t3;
-        if ($[49] !== t1 || $[50] !== t2) {
+        if ($[50] !== t1 || $[51] !== t2) {
           t3 = <Box flexDirection="column" gap={1}>{t1}{t2}</Box>;
-          $[49] = t1;
-          $[50] = t2;
-          $[51] = t3;
+          $[50] = t1;
+          $[51] = t2;
+          $[52] = t3;
         } else {
-          t3 = $[51];
+          t3 = $[52];
         }
         return t3;
       }
