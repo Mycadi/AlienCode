@@ -715,6 +715,11 @@ export type Attachment =
       warningCount: number
       sample: string
     }
+  | {
+      type: 'goal_reminder'
+      goalText: string
+      progress: string
+    }
 
 export type TeammateMailboxAttachment = {
   type: 'teammate_mailbox'
@@ -918,6 +923,9 @@ export async function getAttachments(
     ),
     maybe('critical_system_reminder', () =>
       Promise.resolve(getCriticalSystemReminderAttachment(toolUseContext)),
+    ),
+    maybe('goal_reminder', () =>
+      Promise.resolve(getGoalReminderAttachment()),
     ),
     ...(feature('COMPACTION_REMINDERS')
       ? [
@@ -1592,6 +1600,27 @@ function getCriticalSystemReminderAttachment(
     return []
   }
   return [{ type: 'critical_system_reminder', content: reminder }]
+}
+
+function getGoalReminderAttachment(): Attachment[] {
+  const { getGoal } = require('../commands/goal/goalState.js') as typeof import('../commands/goal/goalState.js')
+  const goal = getGoal()
+  if (!goal || goal.isCompleted) {
+    return []
+  }
+
+  const parts: string[] = []
+  parts.push(`Turn ${goal.turnsElapsed + 1}`)
+  if (goal.maxTurns !== undefined) {
+    parts.push(`of ${goal.maxTurns}`)
+  }
+  if (goal.maxMinutes !== undefined) {
+    const elapsed = Math.round((Date.now() - goal.startTime) / 60_000)
+    parts.push(`(${elapsed}/${goal.maxMinutes} min)`)
+  }
+  const progress = parts.join(' ')
+
+  return [{ type: 'goal_reminder', goalText: goal.goalText, progress }]
 }
 
 function getOutputStyleAttachment(): Attachment[] {

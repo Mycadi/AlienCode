@@ -3874,6 +3874,22 @@ You have exited auto mode. The user may now want to interact more directly. You 
         createUserMessage({ content: attachment.content, isMeta: true }),
       ])
     }
+    case 'goal_reminder': {
+      const content = `## Active Goal
+
+**Goal:** ${attachment.goalText}
+**Progress:** ${attachment.progress}
+
+You are working toward the goal above. Each turn:
+1. Make progress toward the goal.
+2. At the end of your response, report progress briefly.
+3. If you believe the goal is fully achieved, clearly state: "**Goal completed.**"
+4. If the goal cannot be achieved, explain why and state: "**Goal blocked.**"`
+
+      return wrapMessagesInSystemReminder([
+        createUserMessage({ content, isMeta: true }),
+      ])
+    }
     case 'mcp_resource': {
       // Format the resource content similar to how file attachments work
       const content = attachment.content

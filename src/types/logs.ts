@@ -50,6 +50,7 @@ export type LogOption = {
   mode?: 'coordinator' | 'normal' // Session mode for coordinator/normal detection
   worktreeSession?: PersistedWorktreeSession | null // Worktree state at session end (null = exited, undefined = never entered)
   contentReplacements?: ContentReplacementRecord[] // Replacement decisions for resume reconstruction
+  goal?: { goalText: string; maxTurns?: number; maxMinutes?: number } // Active goal at session end
 }
 
 export type SummaryMessage = {
@@ -119,6 +120,14 @@ export type AgentSettingMessage = {
   type: 'agent-setting'
   sessionId: UUID
   agentSetting: string
+}
+
+export type GoalMessage = {
+  type: 'goal'
+  sessionId: UUID
+  goalText: string
+  maxTurns?: number
+  maxMinutes?: number
 }
 
 /**
@@ -315,6 +324,7 @@ export type Entry =
   | ContentReplacementEntry
   | ContextCollapseCommitEntry
   | ContextCollapseSnapshotEntry
+  | GoalMessage
 
 export function sortLogs(logs: LogOption[]): LogOption[] {
   return logs.sort((a, b) => {

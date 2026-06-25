@@ -1869,6 +1869,16 @@ export function REPL({
       // cached name and write it to the wrong transcript on first message.
       clearSessionMetadata();
       restoreSessionMetadata(log);
+
+      // Restore goal from the resumed session (turnsElapsed and startTime reset)
+      {
+        const { clearGoal, restoreGoal } = require('../commands/goal/goalState.js') as typeof import('../commands/goal/goalState.js');
+        if (log.goal) {
+          restoreGoal(log.goal.goalText, { maxTurns: log.goal.maxTurns, maxMinutes: log.goal.maxMinutes });
+        } else {
+          clearGoal();
+        }
+      }
       // Resumed sessions shouldn't re-title from mid-conversation context
       // (same reasoning as the useRef seed), and the previous session's
       // Haiku title shouldn't carry over.
@@ -2862,6 +2872,45 @@ export function REPL({
 
     // Signal that a query turn has completed successfully
     await onTurnComplete?.(messagesRef.current);
+
+    // Goal tracking: increment turn and check limits/completion
+    {
+      const { getGoal, incrementTurn, isLimitReached, markGoalComplete } = require('../commands/goal/goalState.js') as typeof import('../commands/goal/goalState.js');
+      const goal = getGoal();
+      if (goal && !goal.isCompleted) {
+        incrementTurn();
+        const limitCheck = isLimitReached();
+        if (limitCheck?.reached) {
+          markGoalComplete(limitCheck.reason);
+        } else {
+          // Check if Claude claimed completion in the last assistant message
+          const msgs = messagesRef.current;
+          const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant');
+          if (lastAssistant) {
+            const text = typeof lastAssistant.content === 'string'
+              ? lastAssistant.content
+              : Array.isArray(lastAssistant.content)
+                ? lastAssistant.content
+                    .filter((b: { type: string }) => b.type === 'text')
+                    .map((b: { type: 'text'; text: string }) => b.text)
+                    .join('')
+                : '';
+            if (/\*\*Goal completed\.?\*\*/i.test(text) || /\*\*Goal blocked\.?\*\*/i.test(text)) {
+              // Side query evaluator confirms
+              const { evaluateGoalCompletion } = require('../commands/goal/goalEvaluator.js') as typeof import('../commands/goal/goalEvaluator.js');
+              try {
+                const evaluation = await evaluateGoalCompletion(getGoal()!, msgs);
+                if (evaluation.completed) {
+                  markGoalComplete('goal_met');
+                }
+              } catch {
+                // Evaluator failure is non-fatal; goal continues
+              }
+            }
+          }
+        }
+      }
+    }
   }, [initialMcpClients, resetLoadingState, getToolUseContext, toolPermissionContext, setAppState, customSystemPrompt, onTurnComplete, appendSystemPrompt, canUseTool, mainThreadAgentDefinition, onQueryEvent, sessionTitle, titleDisabled]);
   const onQuery = useCallback(async (newMessages: MessageType[], abortController: AbortController, shouldQuery: boolean, additionalAllowedTools: string[], mainLoopModelParam: string, onBeforeQueryCallback?: (input: string, newMessages: MessageType[]) => Promise<boolean>, input?: string, effort?: EffortValue): Promise<void> => {
     // If this is a teammate, mark them as active when starting a turn

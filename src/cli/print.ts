@@ -585,6 +585,19 @@ export async function runHeadless(
     return
   }
 
+  // Handle /goal prefix in headless mode: parse and activate goal, then
+  // pass the goal text as the actual prompt.
+  if (typeof inputPrompt === 'string' && inputPrompt.trimStart().startsWith('/goal ')) {
+    const { parseGoalArgs } = require('../commands/goal/goal.js') as typeof import('../commands/goal/goal.js')
+    const { setGoal } = require('../commands/goal/goalState.js') as typeof import('../commands/goal/goalState.js')
+    const goalArgs = inputPrompt.trimStart().slice('/goal '.length)
+    const parsed = parseGoalArgs(goalArgs)
+    if (parsed) {
+      setGoal(parsed.goalText, { maxTurns: parsed.maxTurns, maxMinutes: parsed.maxMinutes })
+      inputPrompt = parsed.goalText
+    }
+  }
+
   const structuredIO = getStructuredIO(inputPrompt, options)
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
@@ -2253,6 +2266,43 @@ function runHeadlessStreaming(
           // Forward messages to bridge after each turn
           forwardMessagesToBridge()
           bridgeHandle?.sendResult()
+
+          // Goal tracking in headless mode
+          {
+            const { getGoal, incrementTurn, isLimitReached, markGoalComplete } = require('../commands/goal/goalState.js') as typeof import('../commands/goal/goalState.js')
+            const goal = getGoal()
+            if (goal && !goal.isCompleted) {
+              incrementTurn()
+              const limitCheck = isLimitReached()
+              if (limitCheck?.reached) {
+                markGoalComplete(limitCheck.reason)
+              } else {
+                // Check if Claude claimed completion
+                const lastMsg = mutableMessages[mutableMessages.length - 1]
+                if (lastMsg?.role === 'assistant') {
+                  const text = typeof lastMsg.content === 'string'
+                    ? lastMsg.content
+                    : Array.isArray(lastMsg.content)
+                      ? lastMsg.content
+                          .filter((b: { type: string }) => b.type === 'text')
+                          .map((b: { type: 'text'; text: string }) => b.text)
+                          .join('')
+                      : ''
+                  if (/\*\*Goal completed\.?\*\*/i.test(text) || /\*\*Goal blocked\.?\*\*/i.test(text)) {
+                    const { evaluateGoalCompletion } = require('../commands/goal/goalEvaluator.js') as typeof import('../commands/goal/goalEvaluator.js')
+                    try {
+                      const evaluation = await evaluateGoalCompletion(getGoal()!, mutableMessages)
+                      if (evaluation.completed) {
+                        markGoalComplete('goal_met')
+                      }
+                    } catch {
+                      // Evaluator failure is non-fatal
+                    }
+                  }
+                }
+              }
+            }
+          }
 
           if (feature('FILE_PERSISTENCE') && turnStartTime !== undefined) {
             void executeFilePersistence(
