@@ -77,7 +77,14 @@ export function applySettingsChange(
 
     return {
       ...prev,
-      settings: newSettings,
+      settings: {
+        ...newSettings,
+        // Preserve this process's model selection — do not accept model
+        // changes written to settings.json by other processes. Each process
+        // owns its own session-level model choice; persistence is handled
+        // by the writing side (onChangeAppState).
+        model: prev.settings.model,
+      },
       toolPermissionContext: newContext,
       // Only propagate a defined new value — when the disk key is absent
       // (e.g. /effort max for non-ants writes undefined; --effort CLI flag),
