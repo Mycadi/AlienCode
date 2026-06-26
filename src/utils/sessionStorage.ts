@@ -3046,6 +3046,8 @@ export async function loadFullLog(log: LogOption): Promise<LogOption> {
       prUrls,
       prRepositories,
       modes,
+      goals,
+      loops,
       worktreeStates,
       fileHistorySnapshots,
       attributionSnapshots,
@@ -3561,6 +3563,8 @@ export async function loadTranscriptFile(
   prUrls: Map<UUID, string>
   prRepositories: Map<UUID, string>
   modes: Map<UUID, string>
+  goals: Map<UUID, { goalText: string; maxTurns?: number; maxMinutes?: number }>
+  loops: Map<UUID, { taskText: string; intervalMinutes: number }>
   worktreeStates: Map<UUID, PersistedWorktreeSession | null>
   fileHistorySnapshots: Map<UUID, FileHistorySnapshotMessage>
   attributionSnapshots: Map<UUID, AttributionSnapshotMessage>
@@ -3888,6 +3892,8 @@ export async function loadTranscriptFile(
     prUrls,
     prRepositories,
     modes,
+    goals,
+    loops,
     worktreeStates,
     fileHistorySnapshots,
     attributionSnapshots,
