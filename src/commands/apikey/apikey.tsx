@@ -40,13 +40,11 @@ function useApplyProfile(onDone: LocalJSXCommandOnDone): (name: string) => void 
       }
 
       applyApiKeyProfileToEnv(result.profile)
-      if (result.profile.ANTHROPIC_MODEL) {
-        setAppState(prev => ({
-          ...prev,
-          mainLoopModel: result.profile.ANTHROPIC_MODEL ?? null,
-          mainLoopModelForSession: null,
-        }))
-      }
+      setAppState(prev => ({
+        ...prev,
+        mainLoopModel: result.profile.ANTHROPIC_MODEL ?? null,
+        mainLoopModelForSession: null,
+      }))
 
       onDone(formatSuccess(result.name, result.profile))
     },
