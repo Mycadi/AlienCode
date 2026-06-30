@@ -41,6 +41,11 @@ import { useHasSelection, useSelection } from '../../ink/hooks/use-selection.js'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js';
 import { getPlatform } from '../../utils/platform.js';
 import { PrBadge } from '../PrBadge.js';
+import type { Message } from '../../types/message.js';
+import { getCurrentUsage } from '../../utils/tokens.js';
+import { calculateContextPercentages, getContextWindowForModel } from '../../utils/context.js';
+import { getSdkBetas } from '../../bootstrap/state.js';
+import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
 
 // Dead code elimination: conditional import for proactive mode
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -70,6 +75,7 @@ type Props = {
   setHistoryQuery: (query: string) => void;
   historyFailedMatch: boolean;
   onOpenTasksDialog?: (taskId?: string) => void;
+  messages: Message[];
 };
 function ProactiveCountdown() {
   const $ = _c(7);
@@ -142,7 +148,8 @@ export function PromptInputFooterLeftSide(t0) {
     historyQuery,
     setHistoryQuery,
     historyFailedMatch,
-    onOpenTasksDialog
+    onOpenTasksDialog,
+    messages
   } = t0;
   if (exitMessage.show) {
     let t1;
@@ -197,7 +204,7 @@ export function PromptInputFooterLeftSide(t0) {
   const t4 = !suppressHint && !showVim;
   let t5;
   if ($[13] !== isLoading || $[14] !== mode || $[15] !== onOpenTasksDialog || $[16] !== t4 || $[17] !== tasksSelected || $[18] !== teammateFooterIndex || $[19] !== teamsSelected || $[20] !== tmuxSelected || $[21] !== toolPermissionContext) {
-    t5 = <ModeIndicator mode={mode} toolPermissionContext={toolPermissionContext} showHint={t4} isLoading={isLoading} tasksSelected={tasksSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} onOpenTasksDialog={onOpenTasksDialog} />;
+    t5 = <ModeIndicator mode={mode} toolPermissionContext={toolPermissionContext} showHint={t4} isLoading={isLoading} tasksSelected={tasksSelected} teamsSelected={teamsSelected} teammateFooterIndex={teammateFooterIndex} tmuxSelected={tmuxSelected} onOpenTasksDialog={onOpenTasksDialog} messages={messages} />;
     $[13] = isLoading;
     $[14] = mode;
     $[15] = onOpenTasksDialog;
@@ -233,6 +240,7 @@ type ModeIndicatorProps = {
   tmuxSelected: boolean;
   teammateFooterIndex?: number;
   onOpenTasksDialog?: (taskId?: string) => void;
+  messages: Message[];
 };
 function ModeIndicator({
   mode,
@@ -243,7 +251,8 @@ function ModeIndicator({
   teamsSelected,
   tmuxSelected,
   teammateFooterIndex,
-  onOpenTasksDialog
+  onOpenTasksDialog,
+  messages
 }: ModeIndicatorProps): React.ReactNode {
   const {
     columns
@@ -309,6 +318,15 @@ function ModeIndicator({
     }
   }, [voiceEnabled, voiceHintUnderCap]);
   const isKillAgentsConfirmShowing = useAppState(s_7 => s_7.notifications.current?.key === 'kill-agents-confirm');
+
+  // Context usage percentage calculation
+  const mainLoopModelForContext = useMainLoopModel();
+  const contextUsagePercent = useMemo(() => {
+    const currentUsage = getCurrentUsage(messages);
+    const contextWindowSize = getContextWindowForModel(mainLoopModelForContext, getSdkBetas());
+    const percentages = calculateContextPercentages(currentUsage, contextWindowSize);
+    return percentages.used;
+  }, [messages, mainLoopModelForContext]);
 
   // Derive team info from teamContext (no filesystem I/O needed)
   // Match the same logic as TeamStatus to avoid trailing separator
@@ -383,6 +401,13 @@ function ModeIndicator({
     parts.push(...hintParts);
   }
 
+  // Context usage indicator (for teammate pills path, which returns early below)
+  if (hasTeammatePills && contextUsagePercent !== null) {
+    parts.push(<Text dimColor key="context-usage">
+        context {contextUsagePercent}%
+      </Text>);
+  }
+
   // When we have teammate pills, always render them on their own line above other parts
   if (hasTeammatePills) {
     // Don't append spinner hints when viewing a completed teammate —
@@ -450,6 +475,13 @@ function ModeIndicator({
   if ((tasksPart || hasCoordinatorTasks) && showHint && !hasTeams) {
     parts.push(<Text dimColor key="manage-tasks">
         {tasksSelected ? <KeyboardShortcutHint shortcut="Enter" action="view tasks" /> : <KeyboardShortcutHint shortcut="↓" action="manage" />}
+      </Text>);
+  }
+
+  // Context usage indicator
+  if (contextUsagePercent !== null) {
+    parts.push(<Text dimColor key="context-usage">
+        context {contextUsagePercent}%
       </Text>);
   }
 
