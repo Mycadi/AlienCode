@@ -37,27 +37,27 @@ const POSES: Record<ClawdPose, Segments> = {
     r1L: ' ▐',
     r1E: '▛███▜',
     r1R: '▌',
-    r2L: '▝▜',
-    r2R: '▛▘'
+    r2L: ' ▜',
+    r2R: '▛ '
   },
   'look-left': {
     r1L: ' ▐',
     r1E: '▟███▟',
     r1R: '▌',
-    r2L: '▝▜',
-    r2R: '▛▘'
+    r2L: ' ▜',
+    r2R: '▛ '
   },
   'look-right': {
     r1L: ' ▐',
     r1E: '▙███▙',
     r1R: '▌',
-    r2L: '▝▜',
-    r2R: '▛▘'
+    r2L: ' ▜',
+    r2R: '▛ '
   },
   'arms-up': {
-    r1L: '▗▟',
+    r1L: ' ▟',
     r1E: '▛███▜',
-    r1R: '▙▖',
+    r1R: '▙ ',
     r2L: ' ▜',
     r2R: '▛ '
   }
