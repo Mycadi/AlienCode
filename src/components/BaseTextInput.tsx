@@ -106,7 +106,7 @@ export function BaseTextInput(t0) {
   }
   const T0 = Box;
   const T1 = Text;
-  const t4 = "truncate-end";
+  const t4 = "end";
   const t5 = showPlaceholder && props.placeholderElement ? props.placeholderElement : showPlaceholder && renderedPlaceholder ? <Ansi>{renderedPlaceholder}</Ansi> : <Ansi>{renderedValue}</Ansi>;
   const t6 = showArgumentHint && <Text dimColor={true}>{props.value?.endsWith(" ") ? "" : " "}{props.argumentHint}</Text>;
   let t7;

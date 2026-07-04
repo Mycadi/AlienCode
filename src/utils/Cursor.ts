@@ -1,5 +1,4 @@
 import { stringWidth } from '../ink/stringWidth.js'
-import { wrapAnsi } from '../ink/wrapAnsi.js'
 import {
   firstGrapheme,
   getGraphemeSegmenter,
@@ -1291,78 +1290,65 @@ export class MeasuredText {
   }
 
   private measureWrappedText(): WrappedLine[] {
-    const wrappedText = wrapAnsi(this.text, this.columns, {
-      hard: true,
-      trim: false,
-    })
-
+    const columns = Math.max(1, this.columns)
     const wrappedLines: WrappedLine[] = []
-    let searchOffset = 0
-    let lastNewLinePos = -1
+    let lineStart = 0
 
-    const lines = wrappedText.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      const text = lines[i]!
-      const isPrecededByNewline = (startOffset: number) =>
-        i === 0 || (startOffset > 0 && this.text[startOffset - 1] === '\n')
+    while (lineStart <= this.text.length) {
+      const newlineOffset = this.text.indexOf('\n', lineStart)
+      const lineEnd = newlineOffset === -1 ? this.text.length : newlineOffset
+      const hasNewline = newlineOffset !== -1
+      const lineText = this.text.slice(lineStart, lineEnd)
 
-      if (text.length === 0) {
-        // For blank lines, find the next newline character after the last one
-        lastNewLinePos = this.text.indexOf('\n', lastNewLinePos + 1)
-
-        if (lastNewLinePos !== -1) {
-          const startOffset = lastNewLinePos
-          const endsWithNewline = true
-
-          wrappedLines.push(
-            new WrappedLine(
-              text,
-              startOffset,
-              isPrecededByNewline(startOffset),
-              endsWithNewline,
-            ),
-          )
-        } else {
-          // If we can't find another newline, this must be the end of text
-          const startOffset = this.text.length
-          wrappedLines.push(
-            new WrappedLine(
-              text,
-              startOffset,
-              isPrecededByNewline(startOffset),
-              false,
-            ),
-          )
-        }
+      if (lineText.length === 0) {
+        wrappedLines.push(
+          new WrappedLine(
+            '',
+            lineStart,
+            lineStart === 0 || this.text[lineStart - 1] === '\n',
+            hasNewline,
+          ),
+        )
       } else {
-        // For non-blank lines, find the text in this.text
-        const startOffset = this.text.indexOf(text, searchOffset)
+        let segmentStart = lineStart
+        let segmentText = ''
+        let segmentWidth = 0
 
-        if (startOffset === -1) {
-          throw new Error('Failed to find wrapped line in text')
-        }
+        for (const { segment, index } of getGraphemeSegmenter().segment(
+          lineText,
+        )) {
+          const segmentOffset = lineStart + index
+          const width = stringWidth(segment)
 
-        searchOffset = startOffset + text.length
-
-        // Check if this line ends with a newline in this.text
-        const potentialNewlinePos = startOffset + text.length
-        const endsWithNewline =
-          potentialNewlinePos < this.text.length &&
-          this.text[potentialNewlinePos] === '\n'
-
-        if (endsWithNewline) {
-          lastNewLinePos = potentialNewlinePos
+          if (segmentWidth > 0 && segmentWidth + width > columns) {
+            wrappedLines.push(
+              new WrappedLine(
+                segmentText,
+                segmentStart,
+                segmentStart === 0 || this.text[segmentStart - 1] === '\n',
+              ),
+            )
+            segmentStart = segmentOffset
+            segmentText = segment
+            segmentWidth = width
+          } else {
+            segmentText += segment
+            segmentWidth += width
+          }
         }
 
         wrappedLines.push(
           new WrappedLine(
-            text,
-            startOffset,
-            isPrecededByNewline(startOffset),
-            endsWithNewline,
+            segmentText,
+            segmentStart,
+            segmentStart === 0 || this.text[segmentStart - 1] === '\n',
+            hasNewline,
           ),
         )
       }
+
+      if (!hasNewline) break
+      lineStart = newlineOffset + 1
     }
 
     return wrappedLines
