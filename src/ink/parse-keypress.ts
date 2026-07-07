@@ -277,6 +277,17 @@ export function parseMultipleKeypresses(
         const resynthesized = '\x1b' + token.value
         const mouse = parseMouseEvent(resynthesized)
         keys.push(mouse ?? parseKeypress(resynthesized))
+      } else if (
+        token.value.length > 1 &&
+        /[\r\n]/.test(token.value)
+      ) {
+        // Multi-char text containing \r or \n without bracketed paste mode.
+        // Normal keyboard input never produces text+newline in a single
+        // token — this is pasted content from a terminal that doesn't
+        // support bracketed paste (e.g., Windows conhost). Treat the
+        // entire token as a paste so it isn't split into individual
+        // keypresses where \r triggers onSubmit and drops the rest.
+        keys.push(createPasteKey(token.value))
       } else {
         keys.push(parseKeypress(token.value))
       }
@@ -288,6 +299,40 @@ export function parseMultipleKeypresses(
     keys.push(createPasteKey(pasteBuffer))
     inPaste = false
     pasteBuffer = ''
+  }
+
+  // Heuristic paste coalescing for terminals without bracketed paste
+  // (e.g., Windows conhost). When a single feed() produces multiple keys
+  // containing both printable text and a \r (return), normal keyboard
+  // input could not have generated that — it's pasted content whose \r
+  // characters were split into separate tokens by intervening ESC
+  // sequences (ANSI colors, etc.). Merge all raw content into one paste
+  // key to prevent the \r from triggering onSubmit and dropping the rest.
+  // Only coalesce when every item is a plain key (not mouse/response) to
+  // avoid swallowing terminal responses or mouse events.
+  if (
+    !inPaste &&
+    keys.length > 1 &&
+    keys.every((k) => k.kind === 'key') &&
+    keys.some(
+      (k): k is ParsedKey =>
+        k.kind === 'key' && !k.isPasted && k.name === 'return',
+    ) &&
+    keys.some(
+      (k): k is ParsedKey =>
+        k.kind === 'key' &&
+        !k.isPasted &&
+        k.name !== 'return' &&
+        k.name !== 'escape' &&
+        k.sequence !== undefined &&
+        k.sequence.length > 0,
+    )
+  ) {
+    const merged = (keys as ParsedKey[])
+      .map(k => k.sequence ?? '')
+      .join('')
+    keys.length = 0
+    keys.push(createPasteKey(merged))
   }
 
   // Build new state
