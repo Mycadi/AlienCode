@@ -1,6 +1,4 @@
-import { useEffect, useState } from 'react'
 import type { PastedContent } from 'src/utils/config.js'
-import { maybeTruncateInput } from './inputPaste.js'
 
 type Props = {
   input: string
@@ -11,48 +9,15 @@ type Props = {
 }
 
 export function useMaybeTruncateInput({
-  input,
-  pastedContents,
-  onInputChange,
-  setCursorOffset,
-  setPastedContents,
+  input: _input,
+  pastedContents: _pastedContents,
+  onInputChange: _onInputChange,
+  setCursorOffset: _setCursorOffset,
+  setPastedContents: _setPastedContents,
 }: Props) {
-  // Track if we've initialized this specific input value
-  const [hasAppliedTruncationToInput, setHasAppliedTruncationToInput] =
-    useState(false)
-
-  // Process input for truncation and pasted images from MessageSelector.
-  useEffect(() => {
-    if (hasAppliedTruncationToInput) {
-      return
-    }
-
-    if (input.length <= 10_000) {
-      return
-    }
-
-    const { newInput, newPastedContents } = maybeTruncateInput(
-      input,
-      pastedContents,
-    )
-
-    onInputChange(newInput)
-    setCursorOffset(newInput.length)
-    setPastedContents(newPastedContents)
-    setHasAppliedTruncationToInput(true)
-  }, [
-    input,
-    hasAppliedTruncationToInput,
-    pastedContents,
-    onInputChange,
-    setPastedContents,
-    setCursorOffset,
-  ])
-
-  // Reset hasInitializedInput when input is cleared (e.g., after submission)
-  useEffect(() => {
-    if (input === '') {
-      setHasAppliedTruncationToInput(false)
-    }
-  }, [input])
+  // Truncation disabled — LLMs support 1M+ context tokens; silently
+  // dropping middle content at 10k characters causes data loss that the
+  // user cannot recover.  The pasted-text folding path
+  // (onTextPaste → [Pasted text #N]) already keeps long pastes
+  // manageable in the input box without destroying content.
 }

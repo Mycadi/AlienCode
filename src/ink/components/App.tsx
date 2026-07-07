@@ -229,10 +229,10 @@ export default class App extends PureComponent<Props, State> {
         stdin.ref();
         stdin.setRawMode(true);
         stdin.addListener('readable', this.handleReadable);
-        // Enable bracketed paste mode
-        if (!(process.env.CLAUDE_CODE_MINIMAL || process.env.CLAUDE_CODE_NUI)) {
-          this.props.stdout.write(EBP);
-        }
+        // Enable bracketed paste mode (always, including NUI/MINIMAL —
+        // without it multi-line pastes are split into individual keystrokes
+        // and the first \r triggers onSubmit, silently dropping the rest).
+        this.props.stdout.write(EBP);
         // Enable terminal focus reporting (DECSET 1004)
         if (!(process.env.CLAUDE_CODE_MINIMAL || process.env.CLAUDE_CODE_NUI)) {
           this.props.stdout.write(EFE);
@@ -280,9 +280,7 @@ export default class App extends PureComponent<Props, State> {
         this.props.stdout.write(DFE);
       }
       // Disable bracketed paste mode
-      if (!(process.env.CLAUDE_CODE_MINIMAL || process.env.CLAUDE_CODE_NUI)) {
-        this.props.stdout.write(DBP);
-      }
+      this.props.stdout.write(DBP);
       stdin.setRawMode(false);
       stdin.removeListener('readable', this.handleReadable);
       stdin.unref();
