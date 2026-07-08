@@ -7,6 +7,7 @@ export type ModelCapabilityOverride =
   | 'thinking'
   | 'adaptive_thinking'
   | 'interleaved_thinking'
+  | 'vision'
 
 const TIERS = [
   {

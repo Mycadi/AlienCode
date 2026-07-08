@@ -7,6 +7,10 @@ import type {
 import { randomUUID } from 'crypto'
 import type { QuerySource } from 'src/constants/querySource.js'
 import { logEvent } from 'src/services/analytics/index.js'
+import {
+  describeImagesForTextModel,
+  shouldProxyImagesThroughVision,
+} from 'src/services/api/visionProxy.js'
 import { getContentText } from 'src/utils/messages.js'
 import {
   findCommand,
@@ -387,7 +391,7 @@ async function processUserInputBase(
     }),
   )
   // Collect results preserving order
-  const imageContentBlocks: ContentBlockParam[] = []
+  let imageContentBlocks: ContentBlockParam[] = []
   for (const {
     resized,
     originalDimensions,
@@ -573,6 +577,18 @@ async function processUserInputBase(
     }
   }
 
+  if (shouldProxyImagesThroughVision(context.options.mainLoopModel)) {
+    const proxied = await proxyImageBlocksForTextModel(
+      normalizedInput,
+      imageContentBlocks,
+      inputString,
+      context,
+      querySource,
+    )
+    normalizedInput = proxied.input
+    imageContentBlocks = proxied.imageContentBlocks
+  }
+
   // Regular user prompt
   return addImageMetadataMessage(
     processTextPrompt(
@@ -602,4 +618,67 @@ function addImageMetadataMessage(
     )
   }
   return result
+}
+
+async function proxyImageBlocksForTextModel(
+  input: string | ContentBlockParam[],
+  imageContentBlocks: ContentBlockParam[],
+  userText: string | null,
+  context: ProcessUserInputContext,
+  querySource?: QuerySource,
+): Promise<{
+  input: string | ContentBlockParam[]
+  imageContentBlocks: ContentBlockParam[]
+}> {
+  const inputImages = Array.isArray(input) ? input.filter(isImageBlock) : []
+  const pastedImages = imageContentBlocks.filter(isImageBlock)
+
+  if (inputImages.length === 0 && pastedImages.length === 0) {
+    return { input, imageContentBlocks }
+  }
+
+  const inputDescriptions = await describeImagesForTextModel({
+    images: inputImages,
+    userText,
+    options: {
+      querySource: querySource ?? context.options.querySource,
+      mcpTools: context.options.tools,
+      signal: context.abortController.signal,
+      mainModel: context.options.mainLoopModel,
+    },
+  })
+  const pastedDescriptions = await describeImagesForTextModel({
+    images: pastedImages,
+    userText,
+    options: {
+      querySource: querySource ?? context.options.querySource,
+      mcpTools: context.options.tools,
+      signal: context.abortController.signal,
+      mainModel: context.options.mainLoopModel,
+    },
+  })
+
+  let nextInput = input
+  if (Array.isArray(input) && inputDescriptions.length > 0) {
+    let descriptionIndex = 0
+    nextInput = input.flatMap(block => {
+      if (!isImageBlock(block)) return [block]
+      return [inputDescriptions[descriptionIndex++]!]
+    })
+  }
+
+  let pastedDescriptionIndex = 0
+  const nextImageContentBlocks = imageContentBlocks.flatMap(block => {
+    if (!isImageBlock(block)) return [block]
+    return [pastedDescriptions[pastedDescriptionIndex++]!]
+  })
+
+  return {
+    input: nextInput,
+    imageContentBlocks: nextImageContentBlocks,
+  }
+}
+
+function isImageBlock(block: ContentBlockParam): block is ImageBlockParam {
+  return block.type === 'image'
 }

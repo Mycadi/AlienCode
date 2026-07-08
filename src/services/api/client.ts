@@ -6,6 +6,7 @@ import {
   replaceCchPlaceholder,
 } from 'src/utils/cch.js'
 import type { GoogleAuth } from 'google-auth-library'
+import type { ApiKeyProfile } from 'src/utils/apikey.js'
 import {
   checkAndRefreshOAuthTokenIfNeeded,
   getAnthropicApiKey,
@@ -107,12 +108,14 @@ export async function getAnthropicClient({
   model,
   fetchOverride,
   source,
+  apiKeyProfile,
 }: {
   apiKey?: string
   maxRetries: number
   model?: string
   fetchOverride?: ClientOptions['fetch']
   source?: string
+  apiKeyProfile?: ApiKeyProfile
 }): Promise<Anthropic> {
   const containerId = process.env.CLAUDE_CODE_CONTAINER_ID
   const remoteSessionId = process.env.CLAUDE_CODE_REMOTE_SESSION_ID
@@ -130,6 +133,10 @@ export async function getAnthropicClient({
     // SDK consumers can identify their app/library for backend analytics
     ...(clientApp ? { 'x-client-app': clientApp } : {}),
   }
+
+  const profileAuthToken = apiKeyProfile?.ANTHROPIC_AUTH_TOKEN
+  const profileBaseURL = apiKeyProfile?.ANTHROPIC_BASE_URL
+  const profileModel = apiKeyProfile?.ANTHROPIC_MODEL
 
   // Log API client configuration for HFI debugging
   logForDebugging(
@@ -149,7 +156,11 @@ export async function getAnthropicClient({
   logForDebugging('[API:auth] OAuth token check complete')
 
   if (!isClaudeAISubscriber()) {
-    await configureApiKeyHeaders(defaultHeaders, getIsNonInteractiveSession())
+    await configureApiKeyHeaders(
+      defaultHeaders,
+      getIsNonInteractiveSession(),
+      profileAuthToken,
+    )
   }
 
   const resolvedFetch = buildFetch(fetchOverride, source)
@@ -313,15 +324,17 @@ export async function getAnthropicClient({
     return new AnthropicVertex(vertexArgs) as unknown as Anthropic
   }
 
+  const authToken = profileAuthToken ?? process.env.ANTHROPIC_AUTH_TOKEN
+  const baseURL = profileBaseURL ?? process.env.ANTHROPIC_BASE_URL
+  const envModel = profileModel ?? process.env.ANTHROPIC_MODEL
+  const adapterModel = apiKeyProfile ? model || profileModel : envModel || model
+
   // ── OpenAI-compatible chat/completions via apikey.json ──────────────
-  if (
-    process.env.ANTHROPIC_AUTH_TOKEN &&
-    isOpenAICompatibleChatCompletionsUrl(process.env.ANTHROPIC_BASE_URL)
-  ) {
+  if (authToken && isOpenAICompatibleChatCompletionsUrl(baseURL)) {
     const openAICompatibleFetch = createOpenAICompatibleFetch({
-      apiKey: process.env.ANTHROPIC_AUTH_TOKEN,
-      endpoint: process.env.ANTHROPIC_BASE_URL,
-      model: process.env.ANTHROPIC_MODEL || model,
+      apiKey: authToken,
+      endpoint: baseURL,
+      model: adapterModel,
     })
     const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
       apiKey: 'openai-compatible-placeholder',
@@ -363,10 +376,13 @@ export async function getAnthropicClient({
 
   // Determine authentication method based on available tokens
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-    apiKey: isClaudeAISubscriber() ? null : apiKey || getAnthropicApiKey(),
+    apiKey: isClaudeAISubscriber()
+      ? null
+      : apiKey || profileAuthToken || getAnthropicApiKey(),
     authToken: isClaudeAISubscriber()
       ? getClaudeAIOAuthTokens()?.accessToken
       : undefined,
+    ...(profileBaseURL ? { baseURL: profileBaseURL } : {}),
     // Set baseURL from OAuth config when using staging OAuth
     ...(process.env.USER_TYPE === 'ant' &&
     isEnvTruthy(process.env.USE_STAGING_OAUTH)
@@ -382,8 +398,10 @@ export async function getAnthropicClient({
 async function configureApiKeyHeaders(
   headers: Record<string, string>,
   isNonInteractiveSession: boolean,
+  authTokenOverride?: string,
 ): Promise<void> {
   const token =
+    authTokenOverride ||
     process.env.ANTHROPIC_AUTH_TOKEN ||
     (await getApiKeyFromApiKeyHelper(isNonInteractiveSession))
   if (token) {

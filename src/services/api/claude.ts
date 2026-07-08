@@ -17,9 +17,13 @@ import type {
   BetaUsage,
   BetaMessageParam as MessageParam,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
-import type { TextBlockParam } from '@anthropic-ai/sdk/resources/index.mjs'
+import type {
+  ContentBlockParam,
+  TextBlockParam,
+} from '@anthropic-ai/sdk/resources/index.mjs'
 import type { Stream } from '@anthropic-ai/sdk/streaming.mjs'
 import { randomUUID } from 'crypto'
+import type { ApiKeyProfile } from 'src/utils/apikey.js'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
@@ -687,6 +691,7 @@ export type Options = {
   allowedAgentTypes?: string[]
   hasAppendSystemPrompt: boolean
   fetchOverride?: ClientOptions['fetch']
+  apiKeyProfile?: ApiKeyProfile
   enablePromptCaching?: boolean
   skipCacheWrite?: boolean
   temperatureOverride?: number
@@ -820,6 +825,7 @@ export async function* executeNonStreamingRequest(
     model: string
     fetchOverride?: Options['fetchOverride']
     source: string
+    apiKeyProfile?: ApiKeyProfile
   },
   retryOptions: {
     model: string
@@ -847,6 +853,7 @@ export async function* executeNonStreamingRequest(
         model: clientOptions.model,
         fetchOverride: clientOptions.fetchOverride,
         source: clientOptions.source,
+        apiKeyProfile: clientOptions.apiKeyProfile,
       }),
     async (anthropic, attempt, context) => {
       const start = Date.now()
@@ -1782,6 +1789,7 @@ async function* queryModel(
           model: options.model,
           fetchOverride: options.fetchOverride,
           source: options.querySource,
+          apiKeyProfile: options.apiKeyProfile,
         }),
       async (anthropic, attempt, context) => {
         attemptNumber = attempt
@@ -2549,7 +2557,11 @@ async function* queryModel(
           : 'other') as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
       })
       const result = yield* executeNonStreamingRequest(
-        { model: options.model, source: options.querySource },
+        {
+          model: options.model,
+          source: options.querySource,
+          apiKeyProfile: options.apiKeyProfile,
+        },
         {
           model: options.model,
           fallbackModel: options.fallbackModel,
@@ -2648,7 +2660,11 @@ async function* queryModel(
       try {
         // Fall back to non-streaming mode
         const result = yield* executeNonStreamingRequest(
-          { model: options.model, source: options.querySource },
+          {
+            model: options.model,
+            source: options.querySource,
+            apiKeyProfile: options.apiKeyProfile,
+          },
           {
             model: options.model,
             fallbackModel: options.fallbackModel,
@@ -3305,7 +3321,7 @@ export async function queryWithModel({
   options,
 }: {
   systemPrompt: SystemPrompt
-  userPrompt: string
+  userPrompt: string | ContentBlockParam[]
   outputFormat?: BetaJSONOutputFormat
   signal: AbortSignal
   options: QueryWithModelOptions

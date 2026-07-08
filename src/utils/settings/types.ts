@@ -376,6 +376,31 @@ export const SettingsSchema = lazySchema(() =>
         .string()
         .optional()
         .describe('Override the default model used by Claude Code'),
+      vision: z
+        .object({
+          enabled: z
+            .boolean()
+            .optional()
+            .describe('Enable image-to-text proxying for models without vision support'),
+          model: z
+            .string()
+            .optional()
+            .describe('Vision-capable model used to describe images before sending to text-only models'),
+          apiKeyProfile: z
+            .string()
+            .optional()
+            .describe('API key profile used for vision model requests'),
+          prompt: z
+            .string()
+            .optional()
+            .describe('Custom prompt used when asking the vision model to describe images'),
+          proxyMode: z
+            .enum(['auto', 'always', 'never'])
+            .optional()
+            .describe('When to proxy image inputs through the configured vision model'),
+        })
+        .optional()
+        .describe('Vision model proxy configuration for image inputs'),
       // Enterprise allowlist of models
       availableModels: z
         .array(z.string())

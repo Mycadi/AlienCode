@@ -102,6 +102,21 @@ export function getCurrentApiKeyProfile(): CurrentApiKeyProfileResult {
     return { ok: false, path, error: 'No apikey profiles found' }
   }
 
+  return getApiKeyProfileFromConfig(name, config, path)
+}
+
+export function getApiKeyProfile(name: string): CurrentApiKeyProfileResult {
+  const result = readApiKeyConfig()
+  if (!result.ok) return result
+
+  return getApiKeyProfileFromConfig(name, result.config, result.path)
+}
+
+function getApiKeyProfileFromConfig(
+  name: string,
+  config: ApiKeyConfig,
+  path: string,
+): CurrentApiKeyProfileResult {
   const profile = config.profiles[name]
   if (!profile) {
     return { ok: false, path, error: `Api key profile '${name}' not found` }
