@@ -30,10 +30,6 @@ import { LINK_END, link as oscLink } from './termio/osc.js'
 
 type State = {
   previousOutput: string
-  // Legacy Windows (old conhost) full-repaint path: number of lines the
-  // previous frame occupied. Used to erase exactly those lines (CSI 2K +
-  // cursor-up) instead of clearing the whole screen, which avoids flicker.
-  legacyPrevLineCount: number
 }
 
 type Options = {
@@ -44,21 +40,12 @@ type Options = {
 const CARRIAGE_RETURN = { type: 'carriageReturn' } as const
 const NEWLINE = { type: 'stdout', content: '\n' } as const
 
-function isLegacyWindowsMinimal(): boolean {
-  return (
-    Boolean(process.env.CLAUDE_CODE_MINIMAL) &&
-    process.platform === 'win32' &&
-    !process.env.WT_SESSION
-  )
-}
-
 export class LogUpdate {
   private state: State
 
   constructor(private readonly options: Options) {
     this.state = {
       previousOutput: '',
-      legacyPrevLineCount: 0,
     }
   }
 
@@ -73,7 +60,6 @@ export class LogUpdate {
   // Called when process resumes from suspension (SIGCONT) to prevent clobbering terminal content
   reset(): void {
     this.state.previousOutput = ''
-    this.state.legacyPrevLineCount = 0
   }
 
   private renderFullFrame(frame: Frame): Diff {
@@ -147,58 +133,15 @@ export class LogUpdate {
     const startTime = performance.now()
     const stylePool = this.options.stylePool
 
-    if (isLegacyWindowsMinimal()) {
-      // Old conhost (Win10 1607-era, non-Windows-Terminal) can't parse the
-      // DEC 2026 synchronized-output markers used to hide redraws, so the
-      // previous approach cleared the WHOLE screen (CSI 2J) every frame and
-      // repainted — producing a visible blank→content flash on each frame.
-      // During streaming edits (high frame rate) this reads as constant
-      // flicker.
-      //
-      // Instead, when the frame fits one screen, erase only the lines the
-      // previous frame occupied via eraseLines (CSI 2K per line + cursor-up),
-      // leaving the cursor at the top of the content region, then repaint in
-      // place. No whole-screen erase means no blank flash. We still fully
-      // repaint (rather than diffing) to avoid old conhost's relative-cursor
-      // quirks. When the frame exceeds one screen, eraseLines can't reach
-      // scrollback and desyncs — see the overflow fallback below.
-      const fullFrame = this.renderFullFrame(next)
-      const firstPatch = fullFrame[0]
-      const content =
-        firstPatch && firstPatch.type === 'stdout' ? firstPatch.content : ''
-      const lineCount = content === '' ? 0 : content.split('\n').length
-      const clearCount = this.state.legacyPrevLineCount
-      this.state.legacyPrevLineCount = lineCount
-
-      // eraseLines walks the cursor UP with CSI CUU, which old conhost clamps
-      // at the viewport top — it cannot reach lines that scrolled into
-      // scrollback. Once the frame exceeds one screen height, the erase lands
-      // on the wrong rows: the top half isn't cleared, the repaint scrolls the
-      // terminal, and every subsequent frame's clearCount is off. That desync
-      // reads as constant flicker + ghosting.
-      //
-      // So when either the previous or the current frame is taller than the
-      // viewport, fall back to a whole-screen clear (CSI 2J + home; on legacy
-      // conhost getClearTerminalSequence can't touch scrollback but reliably
-      // resets the visible screen and cursor). This costs one full-screen flash
-      // on the over-height frames, but keeps the in-place no-flash path for the
-      // common case where content still fits one screen.
-      const viewportHeight = next.viewport.height
-      const overflowsViewport =
-        viewportHeight > 0 &&
-        (lineCount > viewportHeight || clearCount > viewportHeight)
-
-      const diff: Diff = []
-      if (overflowsViewport) {
-        diff.push({ type: 'clearTerminal', reason: 'clear' })
-      } else if (clearCount > 0) {
-        diff.push({ type: 'clear', count: clearCount })
-      }
-      if (content !== '') {
-        diff.push({ type: 'stdout', content })
-      }
-      return diff
-    }
+    // Legacy Windows minimal (old conhost) uses the SAME relative-cursor
+    // diff path below as every other terminal. That path never emits DEC 2026
+    // synchronized-output markers on its own (writeDiffToTerminal strips
+    // BSU/ESU for MINIMAL/NUI), uses only CR/LF + CSI 2K + relative cursor
+    // moves — all of which old conhost handles — and lets the terminal scroll
+    // naturally as content grows. A previous MINIMAL-only branch here did a
+    // full erase+repaint every frame, which flickered vertically once content
+    // passed one screen and jittered horizontally because it bypassed the
+    // cursor bookkeeping the outer onRender relies on. Removing it fixes both.
 
     // Since we assume the cursor is at the bottom on the screen, we only need
     // to clear when the viewport gets shorter (i.e. the cursor position drifts)
