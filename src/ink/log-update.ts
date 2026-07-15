@@ -155,11 +155,13 @@ export class LogUpdate {
       // During streaming edits (high frame rate) this reads as constant
       // flicker.
       //
-      // Instead, erase only the lines the previous frame occupied via
-      // eraseLines (CSI 2K per line + cursor-up), leaving the cursor at the
-      // top of the content region, then repaint in place. No whole-screen
-      // erase means no blank flash. We still fully repaint (rather than
-      // diffing) to avoid old conhost's relative-cursor quirks.
+      // Instead, when the frame fits one screen, erase only the lines the
+      // previous frame occupied via eraseLines (CSI 2K per line + cursor-up),
+      // leaving the cursor at the top of the content region, then repaint in
+      // place. No whole-screen erase means no blank flash. We still fully
+      // repaint (rather than diffing) to avoid old conhost's relative-cursor
+      // quirks. When the frame exceeds one screen, eraseLines can't reach
+      // scrollback and desyncs — see the overflow fallback below.
       const fullFrame = this.renderFullFrame(next)
       const firstPatch = fullFrame[0]
       const content =
@@ -168,8 +170,28 @@ export class LogUpdate {
       const clearCount = this.state.legacyPrevLineCount
       this.state.legacyPrevLineCount = lineCount
 
+      // eraseLines walks the cursor UP with CSI CUU, which old conhost clamps
+      // at the viewport top — it cannot reach lines that scrolled into
+      // scrollback. Once the frame exceeds one screen height, the erase lands
+      // on the wrong rows: the top half isn't cleared, the repaint scrolls the
+      // terminal, and every subsequent frame's clearCount is off. That desync
+      // reads as constant flicker + ghosting.
+      //
+      // So when either the previous or the current frame is taller than the
+      // viewport, fall back to a whole-screen clear (CSI 2J + home; on legacy
+      // conhost getClearTerminalSequence can't touch scrollback but reliably
+      // resets the visible screen and cursor). This costs one full-screen flash
+      // on the over-height frames, but keeps the in-place no-flash path for the
+      // common case where content still fits one screen.
+      const viewportHeight = next.viewport.height
+      const overflowsViewport =
+        viewportHeight > 0 &&
+        (lineCount > viewportHeight || clearCount > viewportHeight)
+
       const diff: Diff = []
-      if (clearCount > 0) {
+      if (overflowsViewport) {
+        diff.push({ type: 'clearTerminal', reason: 'clear' })
+      } else if (clearCount > 0) {
         diff.push({ type: 'clear', count: clearCount })
       }
       if (content !== '') {
