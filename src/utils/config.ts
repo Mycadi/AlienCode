@@ -239,6 +239,21 @@ export type GlobalConfig = {
     expiresAt: number
     accountId: string
   }
+
+  /**
+   * Kiro (AWS CodeWhisperer) OAuth tokens, stored separately from Anthropic and
+   * Codex credentials. Acquired by reusing the refresh token from a logged-in
+   * Kiro IDE/CLI and used as Bearer tokens against the CodeWhisperer endpoint.
+   */
+  kiroOAuth?: {
+    accessToken: string
+    refreshToken: string
+    expiresAt: number
+    authMethod: 'Social' | 'IdC'
+    clientId?: string
+    clientSecret?: string
+    profileArn?: string
+  }
   iterm2KeyBindingInstalled?: boolean // Legacy - keeping for backward compatibility
   editorMode?: EditorMode
   bypassPermissionsModeAccepted?: boolean

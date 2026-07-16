@@ -1,7 +1,7 @@
 import { getDirectConnectServerUrl, getSessionId } from '../bootstrap/state.js'
 import { stringWidth } from '../ink/stringWidth.js'
 import type { LogOption } from '../types/logs.js'
-import { getSubscriptionName, isClaudeAISubscriber, isCodexSubscriber } from './auth.js'
+import { getSubscriptionName, isClaudeAISubscriber, isCodexSubscriber, isKiroSubscriber } from './auth.js'
 import { getDisplayedEffortLevel, type EffortValue } from './effort.js'
 import { getCwd } from './cwd.js'
 import { getDisplayPath } from './file.js'
@@ -17,6 +17,7 @@ import {
 import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
+import { isKiroModel } from '../services/api/kiro-fetch-adapter.js'
 
 // Layout constants
 const MAX_LEFT_WIDTH = 50
@@ -261,7 +262,9 @@ export function getLogoDisplayData(): {
     ? getSubscriptionName()
     : isCodexSubscriber()
       ? 'API Billing'
-      : 'API Usage Billing'
+      : isKiroSubscriber()
+        ? 'Kiro Billing'
+        : 'API Usage Billing'
   const agentName = getInitialSettings().agent
 
   return {
@@ -292,6 +295,13 @@ export function formatLogoModelSource(
         modelName: `${modelDisplayName} · ${effort}`,
         sourceName: 'Codex Logged',
       }
+    }
+  }
+
+  if (isKiroSubscriber() && isKiroModel(model)) {
+    return {
+      modelName: modelDisplayName,
+      sourceName: 'Kiro Logged',
     }
   }
 

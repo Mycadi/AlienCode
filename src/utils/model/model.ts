@@ -10,6 +10,7 @@ import {
   getSubscriptionType,
   isClaudeAISubscriber,
   isCodexSubscriber,
+  isKiroSubscriber,
   isMaxSubscriber,
   isProSubscriber,
   isTeamPremiumSubscriber,
@@ -31,6 +32,7 @@ import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
 import { capitalize } from '../stringUtils.js'
 import { DEFAULT_OPENCODE_ZEN_FREE_MODEL } from '../../services/api/opencode-zen-fetch-adapter.js'
+import { DEFAULT_KIRO_MODEL } from '../../services/api/kiro-fetch-adapter.js'
 
 export type ModelShortName = string
 export type ModelName = string
@@ -192,6 +194,7 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
   if (
     process.env.USER_TYPE !== 'ant' &&
     !isCodexSubscriber() &&
+    !isKiroSubscriber() &&
     !isClaudeAISubscriber() &&
     !hasAnthropicModelEnvConfig()
   ) {
@@ -200,6 +203,10 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
 
   if (isCodexSubscriber()) {
     return getModelStrings().gpt53codex
+  }
+
+  if (isKiroSubscriber()) {
+    return DEFAULT_KIRO_MODEL
   }
 
   // Ants default to defaultModel from flag config, or Opus 1M if not configured
@@ -339,6 +346,9 @@ export function getClaudeAiUserDefaultModelDescription(
 ): string {
   if (isCodexSubscriber()) {
     return 'GPT-5.3 Codex · Optimized for code generation and understanding'
+  }
+  if (isKiroSubscriber()) {
+    return 'Claude Sonnet 5 · Kiro subscription (Claude/GPT via CodeWhisperer)'
   }
   if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
     if (isOpus1mMergeEnabled()) {

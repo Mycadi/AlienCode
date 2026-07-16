@@ -49,6 +49,14 @@ export async function validateModel(
     return { valid: true }
   }
 
+  // Check if it's a known Kiro model (handled by fetch adapter, skip Anthropic API validation)
+  const { isKiroSubscriber } = await import('../auth.js')
+  const { isKiroModel } = await import('../../services/api/kiro-fetch-adapter.js')
+  if (isKiroSubscriber() && isKiroModel(normalizedModel)) {
+    validModelCache.set(normalizedModel, true)
+    return { valid: true }
+  }
+
   // Check if it's a known OpenCode Zen free model (handled by fetch adapter)
   const { isOpenCodeZenFreeModel } = await import(
     '../../services/api/opencode-zen-fetch-adapter.js'

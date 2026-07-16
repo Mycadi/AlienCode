@@ -3,6 +3,7 @@ import { getInitialMainLoopModel } from '../../bootstrap/state.js'
 import {
   isClaudeAISubscriber,
   isCodexSubscriber,
+  isKiroSubscriber,
   isMaxSubscriber,
   isTeamPremiumSubscriber,
 } from '../auth.js'
@@ -32,6 +33,7 @@ import {
 } from './model.js'
 import { getGlobalConfig } from '../config.js'
 import { OPENCODE_ZEN_FREE_MODELS, isOpenCodeZenFreeModel } from '../../services/api/opencode-zen-fetch-adapter.js'
+import { KIRO_MODELS } from '../../services/api/kiro-fetch-adapter.js'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -175,8 +177,17 @@ function getGpt54MiniOption(): ModelOption {
   }
 }
 
-function getAnthropicEnvModelOption(): ModelOption | undefined {
-  const envModel = process.env.ANTHROPIC_MODEL
+// Kiro (AWS CodeWhisperer) model options
+function getKiroModelOptions(): ModelOption[] {
+  return KIRO_MODELS.map(model => ({
+    value: model.id,
+    label: model.label,
+    description: `${model.label} · ${model.description}`,
+    descriptionForModel: `${model.label} - ${model.description}`,
+  }))
+}
+
+function getAnthropicEnvModelOption(): ModelOption | undefined {  const envModel = process.env.ANTHROPIC_MODEL
   if (!envModel) return undefined
 
   const knownOption = getKnownModelOption(envModel)
@@ -286,6 +297,22 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       codexOptions.push(anthropicEnvModel)
     }
     return codexOptions
+  }
+
+  // Kiro subscribers get Kiro (Claude/GPT via CodeWhisperer) model options
+  if (isKiroSubscriber()) {
+    const kiroOptions = [
+      getDefaultOptionForUser(),
+      ...getKiroModelOptions(),
+    ]
+    const anthropicEnvModel = getAnthropicEnvModelOption()
+    if (
+      anthropicEnvModel !== undefined &&
+      !kiroOptions.some(option => option.value === anthropicEnvModel.value)
+    ) {
+      kiroOptions.push(anthropicEnvModel)
+    }
+    return kiroOptions
   }
 
   if (isClaudeAISubscriber()) {

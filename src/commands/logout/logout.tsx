@@ -43,6 +43,8 @@ export async function performLogout({
       }
     }
     updated.oauthAccount = undefined;
+    updated.codexOAuth = undefined;
+    updated.kiroOAuth = undefined;
     return updated;
   });
 }

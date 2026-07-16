@@ -11,8 +11,9 @@ import { useKeybinding } from '../keybindings/useKeybinding.js';
 import { getSSLErrorHint } from '../services/api/errorUtils.js';
 import { sendNotification } from '../services/notifier.js';
 import { runCodexOAuthFlow } from '../services/oauth/codex-client.js';
+import { runKiroOAuthFlow } from '../services/oauth/kiro-client.js';
 import { OAuthService } from '../services/oauth/index.js';
-import { getOauthAccountInfo, saveCodexOAuthTokens, validateForceLoginOrg } from '../utils/auth.js';
+import { getOauthAccountInfo, saveCodexOAuthTokens, saveKiroOAuthTokens, validateForceLoginOrg } from '../utils/auth.js';
 import { logError } from '../utils/log.js';
 import { getSettings_DEPRECATED } from '../utils/settings/settings.js';
 import { Select } from './CustomSelect/select.js';
@@ -87,6 +88,7 @@ export function ConsoleOAuthFlow({
     return mode === 'setup-token' || forceLoginMethod === 'claudeai';
   });
   const [loginWithCodex, setLoginWithCodex] = useState(false);
+  const [loginWithKiro, setLoginWithKiro] = useState(false);
   // After a few seconds we suggest the user to copy/paste url if the
   // browser did not open automatically. In this flow we expect the user to
   // copy the code from the browser and paste it in the terminal
@@ -287,6 +289,27 @@ export function ConsoleOAuthFlow({
     }
   }, [setShowPastePrompt, terminal]);
 
+  // Kiro-specific flow — reuses the refresh token from a logged-in Kiro IDE/CLI
+  // (~/.aws/sso/cache) and exchanges it for a CodeWhisperer access token.
+  const startKiroOAuth = useCallback(async () => {
+    try {
+      logEvent('tengu_oauth_kiro_flow_start', {});
+      setOAuthStatus({ state: 'waiting_for_login', url: '' });
+      const kiroTokens = await runKiroOAuthFlow();
+      // Save directly via saveKiroOAuthTokens (bypasses installOAuthTokens Anthropic path)
+      saveKiroOAuthTokens(kiroTokens);
+      logEvent('tengu_oauth_kiro_success', {});
+      setOAuthStatus({ state: 'success' });
+      void sendNotification({ message: 'Kiro login successful', notificationType: 'auth_success' }, terminal);
+    } catch (err) {
+      const msg = (err as Error).message;
+      logEvent('tengu_oauth_kiro_error', {
+        error: msg as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
+      });
+      setOAuthStatus({ state: 'error', message: msg, toRetry: { state: 'idle' } });
+    }
+  }, [terminal]);
+
   const pendingOAuthStartRef = useRef(false);
   useEffect(() => {
     if (oauthStatus.state === 'ready_to_start' && !pendingOAuthStartRef.current) {
@@ -296,6 +319,11 @@ export function ConsoleOAuthFlow({
           void startCodexOAuth_0();
           pendingOAuthStartRef_0.current = false;
         }, startCodexOAuth, pendingOAuthStartRef);
+      } else if (loginWithKiro) {
+        process.nextTick((startKiroOAuth_0: () => Promise<void>, pendingOAuthStartRef_0: React.MutableRefObject<boolean>) => {
+          void startKiroOAuth_0();
+          pendingOAuthStartRef_0.current = false;
+        }, startKiroOAuth, pendingOAuthStartRef);
       } else {
         process.nextTick((startOAuth_0: () => Promise<void>, pendingOAuthStartRef_0: React.MutableRefObject<boolean>) => {
           void startOAuth_0();
@@ -303,7 +331,7 @@ export function ConsoleOAuthFlow({
         }, startOAuth, pendingOAuthStartRef);
       }
     }
-  }, [oauthStatus.state, startOAuth, startCodexOAuth, loginWithCodex]);
+  }, [oauthStatus.state, startOAuth, startCodexOAuth, startKiroOAuth, loginWithCodex, loginWithKiro]);
 
   // Auto-exit for setup-token mode
   useEffect(() => {
@@ -358,7 +386,7 @@ export function ConsoleOAuthFlow({
             </Box>
           </Box>}
       <Box paddingLeft={1} flexDirection="column" gap={1}>
-        <OAuthStatusMessage oauthStatus={oauthStatus} mode={mode} startingMessage={startingMessage} forcedMethodMessage={forcedMethodMessage} showPastePrompt={showPastePrompt} pastedCode={pastedCode} setPastedCode={setPastedCode} cursorOffset={cursorOffset} setCursorOffset={setCursorOffset} textInputColumns={textInputColumns} handleSubmitCode={handleSubmitCode} setOAuthStatus={setOAuthStatus} setLoginWithClaudeAi={setLoginWithClaudeAi} setLoginWithCodex={setLoginWithCodex} loginWithClaudeAi={loginWithClaudeAi} loginWithCodex={loginWithCodex} />
+        <OAuthStatusMessage oauthStatus={oauthStatus} mode={mode} startingMessage={startingMessage} forcedMethodMessage={forcedMethodMessage} showPastePrompt={showPastePrompt} pastedCode={pastedCode} setPastedCode={setPastedCode} cursorOffset={cursorOffset} setCursorOffset={setCursorOffset} textInputColumns={textInputColumns} handleSubmitCode={handleSubmitCode} setOAuthStatus={setOAuthStatus} setLoginWithClaudeAi={setLoginWithClaudeAi} setLoginWithCodex={setLoginWithCodex} setLoginWithKiro={setLoginWithKiro} loginWithClaudeAi={loginWithClaudeAi} loginWithCodex={loginWithCodex} loginWithKiro={loginWithKiro} />
       </Box>
     </Box>;
 }
@@ -377,11 +405,13 @@ type OAuthStatusMessageProps = {
   setOAuthStatus: (status: OAuthStatus) => void;
   setLoginWithClaudeAi: (value: boolean) => void;
   setLoginWithCodex: (value: boolean) => void;
+  setLoginWithKiro: (value: boolean) => void;
   loginWithClaudeAi: boolean;
   loginWithCodex: boolean;
+  loginWithKiro: boolean;
 };
 function OAuthStatusMessage(t0) {
-  const $ = _c(53);
+  const $ = _c(54);
   const {
     oauthStatus,
     mode,
@@ -397,8 +427,10 @@ function OAuthStatusMessage(t0) {
     setOAuthStatus,
     setLoginWithClaudeAi,
     setLoginWithCodex,
+    setLoginWithKiro,
     loginWithClaudeAi,
-    loginWithCodex
+    loginWithCodex,
+    loginWithKiro
   } = t0;
   switch (oauthStatus.state) {
     case "idle":
@@ -447,26 +479,39 @@ function OAuthStatusMessage(t0) {
           }, {
             label: <Text>OpenAI Codex account ·{" "}<Text dimColor={true}>ChatGPT Plus/Pro subscription</Text>{"\n"}</Text>,
             value: "codex"
+          }, {
+            label: <Text>Kiro account ·{" "}<Text dimColor={true}>Claude/GPT via Kiro subscription</Text>{"\n"}</Text>,
+            value: "kiro"
           }];
           $[5] = t6;
         } else {
           t6 = $[5];
         }
         let t7;
-        if ($[6] !== setLoginWithClaudeAi || $[7] !== setOAuthStatus || $[8] !== setLoginWithCodex) {
+        if ($[6] !== setLoginWithClaudeAi || $[7] !== setOAuthStatus || $[8] !== setLoginWithCodex || $[53] !== setLoginWithKiro) {
           t7 = <Box><Select options={t6} onChange={value_0 => {
               if (value_0 === "platform") {
                 logEvent("tengu_oauth_platform_selected", {});
+                setLoginWithCodex(false);
+                setLoginWithKiro(false);
                 setOAuthStatus({
                   state: "platform_setup"
                 });
               } else if (value_0 === "codex") {
                 logEvent("tengu_oauth_codex_selected", {});
                 setLoginWithCodex(true);
+                setLoginWithKiro(false);
+                setLoginWithClaudeAi(false);
+                setOAuthStatus({ state: "ready_to_start" });
+              } else if (value_0 === "kiro") {
+                logEvent("tengu_oauth_kiro_selected", {});
+                setLoginWithKiro(true);
+                setLoginWithCodex(false);
                 setLoginWithClaudeAi(false);
                 setOAuthStatus({ state: "ready_to_start" });
               } else {
                 setLoginWithCodex(false);
+                setLoginWithKiro(false);
                 setOAuthStatus({
                   state: "ready_to_start"
                 });
@@ -482,6 +527,7 @@ function OAuthStatusMessage(t0) {
           $[6] = setLoginWithClaudeAi;
           $[7] = setOAuthStatus;
           $[8] = setLoginWithCodex;
+          $[53] = setLoginWithKiro;
           $[9] = t7;
         } else {
           t7 = $[9];
@@ -636,7 +682,9 @@ function OAuthStatusMessage(t0) {
           ? "Available models: Opus, Sonnet, Haiku"
           : loginWithCodex
             ? "Available models: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.4 Mini"
-            : null;
+            : loginWithKiro
+              ? "Available models: claude-sonnet-5, claude-opus-4.8, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna"
+              : null;
         let t2;
         if ($[43] !== t1 || $[44] !== availableModelsText) {
           t2 = <Box flexDirection="column">{t1}{availableModelsText ? <Text dimColor={true}>{availableModelsText}</Text> : null}</Box>;

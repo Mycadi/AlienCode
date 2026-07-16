@@ -25,6 +25,7 @@ import {
   shouldUseClaudeAIAuth,
 } from '../services/oauth/client.js'
 import type { CodexTokens } from '../services/oauth/codex-client.js'
+import type { KiroTokens } from '../services/oauth/kiro-client.js'
 import { getOauthProfileFromOauthToken } from '../services/oauth/getOauthProfile.js'
 import type { OAuthTokens, SubscriptionType } from '../services/oauth/types.js'
 import {
@@ -1366,6 +1367,60 @@ export function clearCodexOAuthTokens(): void {
   })
 }
 
+// ── Kiro (CodeWhisperer) OAuth token storage ─────────────────────────────────
+// Kiro tokens are stored in GlobalConfig separately from Anthropic and Codex
+// credentials, and are only ever sent to the CodeWhisperer endpoint.
+
+/**
+ * Saves the Kiro OAuth tokens to GlobalConfig.
+ * Does NOT overwrite Anthropic's claudeAiOauth or the codexOAuth block.
+ */
+export function saveKiroOAuthTokens(tokens: KiroTokens): void {
+  saveGlobalConfig((cfg) => ({
+    ...cfg,
+    kiroOAuth: {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+      authMethod: tokens.authMethod,
+      clientId: tokens.clientId,
+      clientSecret: tokens.clientSecret,
+      profileArn: tokens.profileArn,
+    },
+  }))
+}
+
+/**
+ * Retrieves the stored Kiro OAuth tokens from GlobalConfig.
+ * Returns null if no Kiro tokens are stored.
+ */
+export function getKiroOAuthTokens(): KiroTokens | null {
+  const cfg = getGlobalConfig()
+  const stored = cfg.kiroOAuth
+  if (!stored?.accessToken || !stored.refreshToken) {
+    return null
+  }
+  return {
+    accessToken: stored.accessToken,
+    refreshToken: stored.refreshToken,
+    expiresAt: stored.expiresAt ?? 0,
+    authMethod: stored.authMethod ?? 'Social',
+    clientId: stored.clientId,
+    clientSecret: stored.clientSecret,
+    profileArn: stored.profileArn,
+  }
+}
+
+/**
+ * Removes Kiro OAuth tokens from GlobalConfig (e.g., on logout).
+ */
+export function clearKiroOAuthTokens(): void {
+  saveGlobalConfig((cfg) => {
+    const { kiroOAuth: _removed, ...rest } = cfg
+    return rest as typeof cfg
+  })
+}
+
 
 let lastCredentialsMtimeMs = 0
 
@@ -1629,6 +1684,12 @@ export function isClaudeAISubscriber(): boolean {
 export function isCodexSubscriber(): boolean {
   // Check if we have valid Codex tokens stored (from successful OpenAI Codex login)
   const tokens = getCodexOAuthTokens()
+  return !!tokens?.accessToken
+}
+
+export function isKiroSubscriber(): boolean {
+  // Check if we have valid Kiro tokens stored (from successful Kiro login)
+  const tokens = getKiroOAuthTokens()
   return !!tokens?.accessToken
 }
 

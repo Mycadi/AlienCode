@@ -13,8 +13,10 @@ import {
   getApiKeyFromApiKeyHelper,
   getClaudeAIOAuthTokens,
   getCodexOAuthTokens,
+  getKiroOAuthTokens,
   isClaudeAISubscriber,
   isCodexSubscriber,
+  isKiroSubscriber,
   refreshAndGetAwsCredentials,
   refreshGcpCredentialsIfNeeded,
 } from 'src/utils/auth.js'
@@ -37,6 +39,7 @@ import {
   isEnvTruthy,
 } from '../../utils/envUtils.js'
 import { createCodexFetch, isCodexModel } from './codex-fetch-adapter.js'
+import { createKiroFetch, isKiroModel } from './kiro-fetch-adapter.js'
 import {
   createOpenAICompatibleFetch,
   isOpenAICompatibleChatCompletionsUrl,
@@ -355,6 +358,21 @@ export async function getAnthropicClient({
         apiKey: 'codex-placeholder', // SDK requires a key but the fetch adapter handles auth
         ...ARGS,
         fetch: codexFetch as unknown as typeof globalThis.fetch,
+        ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+      }
+      return new Anthropic(clientConfig)
+    }
+  }
+
+  // ── Kiro (AWS CodeWhisperer) provider via fetch adapter ───────────
+  if (isKiroSubscriber() && model && isKiroModel(model)) {
+    const kiroTokens = getKiroOAuthTokens()
+    if (kiroTokens?.accessToken) {
+      const kiroFetch = createKiroFetch(kiroTokens.accessToken)
+      const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
+        apiKey: 'kiro-placeholder', // SDK requires a key but the fetch adapter handles auth
+        ...ARGS,
+        fetch: kiroFetch as unknown as typeof globalThis.fetch,
         ...(isDebugToStdErr() && { logger: createStderrLogger() }),
       }
       return new Anthropic(clientConfig)

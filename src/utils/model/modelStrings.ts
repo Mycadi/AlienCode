@@ -12,7 +12,10 @@ import {
   type CanonicalModelId,
   type ModelKey,
 } from './configs.js'
-import { type APIProvider, getAPIProvider } from './providers.js'
+import {
+  type ModelTableProvider,
+  getModelTableProvider,
+} from './providers.js'
 
 /**
  * Maps each model version to its provider-specific model ID string.
@@ -22,7 +25,7 @@ export type ModelStrings = Record<ModelKey, string>
 
 const MODEL_KEYS = Object.keys(ALL_MODEL_CONFIGS) as ModelKey[]
 
-function getBuiltinModelStrings(provider: APIProvider): ModelStrings {
+function getBuiltinModelStrings(provider: ModelTableProvider): ModelStrings {
   const out = {} as ModelStrings
   for (const key of MODEL_KEYS) {
     out[key] = ALL_MODEL_CONFIGS[key][provider]
@@ -122,8 +125,8 @@ function initModelStrings(): void {
     return
   }
   // Initial with default values for non-Bedrock providers
-  if (getAPIProvider() !== 'bedrock') {
-    setModelStringsState(getBuiltinModelStrings(getAPIProvider()))
+  if (getModelTableProvider() !== 'bedrock') {
+    setModelStringsState(getBuiltinModelStrings(getModelTableProvider()))
     return
   }
   // On Bedrock, update model strings in the background without blocking.
@@ -139,7 +142,7 @@ export function getModelStrings(): ModelStrings {
     initModelStrings()
     // Bedrock path falls through here while the profile fetch runs in the
     // background — still honor overrides on the interim defaults.
-    return applyModelOverrides(getBuiltinModelStrings(getAPIProvider()))
+    return applyModelOverrides(getBuiltinModelStrings(getModelTableProvider()))
   }
   return applyModelOverrides(ms)
 }
@@ -156,8 +159,8 @@ export async function ensureModelStringsInitialized(): Promise<void> {
   }
 
   // For non-Bedrock, initialize synchronously
-  if (getAPIProvider() !== 'bedrock') {
-    setModelStringsState(getBuiltinModelStrings(getAPIProvider()))
+  if (getModelTableProvider() !== 'bedrock') {
+    setModelStringsState(getBuiltinModelStrings(getModelTableProvider()))
     return
   }
 

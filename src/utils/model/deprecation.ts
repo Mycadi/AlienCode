@@ -4,7 +4,10 @@
  * Contains information about deprecated models and their retirement dates.
  */
 
-import { type APIProvider, getAPIProvider } from './providers.js'
+import {
+  type ModelTableProvider,
+  getModelTableProvider,
+} from './providers.js'
 import { WARN } from '../nuiChars.js';
 
 type DeprecatedModelInfo = {
@@ -23,7 +26,7 @@ type DeprecationEntry = {
   /** Human-readable model name */
   modelName: string
   /** Retirement dates by provider (null = not deprecated for that provider) */
-  retirementDates: Record<APIProvider, string | null>
+  retirementDates: Record<ModelTableProvider, string | null>
 }
 
 /**
@@ -66,7 +69,7 @@ const DEPRECATED_MODELS: Record<string, DeprecationEntry> = {
  */
 function getDeprecatedModelInfo(modelId: string): DeprecationInfo {
   const lowercaseModelId = modelId.toLowerCase()
-  const provider = getAPIProvider()
+  const provider = getModelTableProvider()
 
   for (const [key, value] of Object.entries(DEPRECATED_MODELS)) {
     const retirementDate = value.retirementDates[provider]

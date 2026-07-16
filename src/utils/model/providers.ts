@@ -2,7 +2,20 @@ import type { AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS } from 
 import { getGlobalConfig } from '../config.js'
 import { isEnvTruthy } from '../envUtils.js'
 
-export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry' | 'openai'
+export type APIProvider = 'firstParty' | 'bedrock' | 'vertex' | 'foundry' | 'openai' | 'kiro'
+
+/**
+ * Providers that have per-model string tables (ALL_MODEL_CONFIGS, retirement
+ * dates, etc.). Kiro is excluded: it reuses first-party model IDs and picks its
+ * real models via the ModelPicker + kiro-fetch-adapter, not these tables.
+ */
+export type ModelTableProvider = Exclude<APIProvider, 'kiro'>
+
+/** Like getAPIProvider() but collapses Kiro to firstParty for model-table lookups. */
+export function getModelTableProvider(): ModelTableProvider {
+  const provider = getAPIProvider()
+  return provider === 'kiro' ? 'firstParty' : provider
+}
 
 export function getAPIProvider(): APIProvider {
   return isEnvTruthy(process.env.CLAUDE_CODE_USE_BEDROCK)
@@ -13,7 +26,9 @@ export function getAPIProvider(): APIProvider {
         ? 'foundry'
         : isEnvTruthy(process.env.CLAUDE_CODE_USE_OPENAI) || hasCodexTokens()
           ? 'openai'
-          : 'firstParty'
+          : hasKiroTokens()
+            ? 'kiro'
+            : 'firstParty'
 }
 
 /**
@@ -23,6 +38,20 @@ export function getAPIProvider(): APIProvider {
 function hasCodexTokens(): boolean {
   try {
     const stored = getGlobalConfig().codexOAuth
+    return !!stored?.accessToken && !!stored?.refreshToken
+  } catch {
+    // Config not yet initialized during early startup
+    return false
+  }
+}
+
+/**
+ * Check if valid Kiro OAuth tokens are stored in GlobalConfig.
+ * Used to auto-detect the Kiro (CodeWhisperer) provider.
+ */
+function hasKiroTokens(): boolean {
+  try {
+    const stored = getGlobalConfig().kiroOAuth
     return !!stored?.accessToken && !!stored?.refreshToken
   } catch {
     // Config not yet initialized during early startup
