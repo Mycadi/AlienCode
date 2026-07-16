@@ -18,6 +18,8 @@
  */
 
 import { randomUUID } from 'crypto'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import {
   KIRO_CODEWHISPERER_URL,
   KIRO_IDE_USER_AGENT,
@@ -25,6 +27,7 @@ import {
 } from '../../constants/kiro-oauth.js'
 import { getKiroOAuthTokens, saveKiroOAuthTokens } from '../../utils/auth.js'
 import { refreshKiroToken } from '../oauth/kiro-client.js'
+import { getCwd } from '../../utils/cwd.js'
 import { logError } from '../../utils/log.js'
 
 // ── Available Kiro models ───────────────────────────────────────────
@@ -54,6 +57,19 @@ export function mapClaudeModelToKiro(claudeModel: string | null): string {
   if (lower.includes('opus')) return 'claude-opus-4.8'
   if (lower.includes('sonnet')) return 'claude-sonnet-5'
   return DEFAULT_KIRO_MODEL
+}
+
+/**
+ * Reads the project's AGENTS.md so Kiro (CodeWhisperer) always receives the
+ * project rules. Kiro has no dedicated system field, so the content is folded
+ * into the synthesized system turn. Returns '' when absent or unreadable.
+ */
+function readProjectAgentsMd(): string {
+  try {
+    return readFileSync(join(getCwd(), 'AGENTS.md'), 'utf8').trim()
+  } catch {
+    return ''
+  }
 }
 
 // ── Anthropic request types (subset) ────────────────────────────────
@@ -175,6 +191,14 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
         ? extractText(anthropicBody.system as AnthropicContentBlock[])
         : ''
 
+  // Inject the project's AGENTS.md at the front of the system turn. Guard
+  // against duplication in case the main loop already folded it into `system`.
+  const agentsMd = readProjectAgentsMd()
+  const systemWithAgents =
+    agentsMd && !systemText.includes(agentsMd)
+      ? `${agentsMd}\n\n${systemText}`.trim()
+      : systemText
+
   // The last message is the "current" one; the rest becomes history.
   const current = messages[messages.length - 1]
   const historyMessages = messages.slice(0, -1)
@@ -182,9 +206,13 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
   const history: Array<Record<string, unknown>> = []
   // Prepend the system prompt as the first user turn (CodeWhisperer has no
   // dedicated system field).
-  if (systemText) {
+  if (systemWithAgents) {
     history.push({
-      userInputMessage: { content: systemText, modelId, origin: 'AI_EDITOR' },
+      userInputMessage: {
+        content: systemWithAgents,
+        modelId,
+        origin: 'AI_EDITOR',
+      },
     })
     history.push({
       assistantResponseMessage: { content: 'Understood.' },

@@ -89,6 +89,9 @@ import {
   DONT_ASK_REJECT_MESSAGE,
 } from '../messages.js'
 import { calculateCostFromTokens } from '../modelCost.js'
+import { isKiroSubscriber } from '../auth.js'
+import { getMainLoopModel } from '../model/model.js'
+import { isKiroModel } from '../../services/api/kiro-fetch-adapter.js'
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { jsonStringify } from '../slowOperations.js'
 import {
@@ -1265,17 +1268,27 @@ async function hasPermissionsToUseToolInner(
   // Check if permissions should be bypassed:
   // - Direct bypassPermissions mode
   // - Plan mode when the user originally started with bypass mode (isBypassPermissionsModeAvailable)
+  // - Kiro model selected: Kiro (CodeWhisperer) runs in trust-all-tools mode,
+  //   so it never prompts. Uses the same condition as the Kiro fetch adapter
+  //   (client.ts) so only an actually-selected Kiro model triggers it — merely
+  //   having Kiro tokens while on an Anthropic model must not bypass.
+  const isKiroTrustAll = isKiroSubscriber() && isKiroModel(getMainLoopModel())
   const shouldBypassPermissions =
     appState.toolPermissionContext.mode === 'bypassPermissions' ||
     (appState.toolPermissionContext.mode === 'plan' &&
-      appState.toolPermissionContext.isBypassPermissionsModeAvailable)
+      appState.toolPermissionContext.isBypassPermissionsModeAvailable) ||
+    isKiroTrustAll
   if (shouldBypassPermissions) {
     return {
       behavior: 'allow',
       updatedInput: getUpdatedInputOrFallback(toolPermissionResult, input),
       decisionReason: {
         type: 'mode',
-        mode: appState.toolPermissionContext.mode,
+        // Kiro's trust-all runs regardless of the user's actual mode, so report
+        // it as bypassPermissions rather than the (possibly default) UI mode.
+        mode: isKiroTrustAll
+          ? 'bypassPermissions'
+          : appState.toolPermissionContext.mode,
       },
     }
   }
