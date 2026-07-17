@@ -46,6 +46,8 @@ import { getCurrentUsage } from '../../utils/tokens.js';
 import { calculateContextPercentages, getContextWindowForModel } from '../../utils/context.js';
 import { getSdkBetas } from '../../bootstrap/state.js';
 import { useMainLoopModel } from '../../hooks/useMainLoopModel.js';
+import { renderModelName } from '../../utils/model/model.js';
+import { getLogoDisplayData, formatLogoModelSource } from '../../utils/logoV2Utils.js';
 
 // Dead code elimination: conditional import for proactive mode
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -366,10 +368,6 @@ function ModeIndicator({
   const modePart = currentMode && hasActiveMode && !getIsRemoteMode() ? <Text color={getModeColor(currentMode)} key="mode">
         {permissionModeSymbol(currentMode)}{' '}
         {permissionModeTitle(currentMode).toLowerCase()} on
-        {shouldShowModeHint && <Text dimColor>
-            {' '}
-            <KeyboardShortcutHint shortcut={modeCycleShortcut} action="cycle" parens />
-          </Text>}
       </Text> : null;
 
   // Build parts array - exclude BackgroundTaskStatus when we have teammate pills
@@ -405,6 +403,16 @@ function ModeIndicator({
   if (hasTeammatePills && contextUsagePercent !== null) {
     parts.push(<Text dimColor key="context-usage">
         context {contextUsagePercent}%
+      </Text>);
+  }
+
+  // Model and billing display (for teammate pills path)
+  if (hasTeammatePills) {
+    const { billingType: bt } = getLogoDisplayData();
+    const mdn = renderModelName(mainLoopModelForContext);
+    const { modelName: mn, sourceName: sn } = formatLogoModelSource(mainLoopModelForContext, mdn, undefined, bt);
+    parts.push(<Text dimColor key="model-billing">
+        {mn}{sn ? ` · ${sn}` : ''}
       </Text>);
   }
 
@@ -485,6 +493,14 @@ function ModeIndicator({
       </Text>);
   }
 
+  // Model and billing display
+  const { billingType } = getLogoDisplayData();
+  const modelDisplayName = renderModelName(mainLoopModelForContext);
+  const { modelName, sourceName } = formatLogoModelSource(mainLoopModelForContext, modelDisplayName, undefined, billingType);
+  parts.push(<Text dimColor key="model-billing">
+      {modelName}{sourceName ? ` · ${sourceName}` : ''}
+    </Text>);
+
   // In fullscreen the bottom section is flexShrink:0 — every row here
   // is a row stolen from the ScrollBox. This component must have a STABLE
   // height so the footer never grows/shrinks and shifts scroll content.
@@ -535,9 +551,7 @@ function getSpinnerHintParts(isLoading: boolean, escShortcut: string, todosShort
   // Show the toggle hint only when there are task items to display or
   // teammates to cycle to
   const showToggleHint = hasTaskItems || hasTeammates;
-  return [...(isLoading ? [<Text dimColor key="esc">
-            <KeyboardShortcutHint shortcut={escShortcut} action="interrupt" />
-          </Text>] : []), ...(!isLoading && hasRunningAgentTasks && !isKillAgentsConfirmShowing ? [<Text dimColor key="kill-agents">
+  return [...(!isLoading && hasRunningAgentTasks && !isKillAgentsConfirmShowing ? [<Text dimColor key="kill-agents">
             <KeyboardShortcutHint shortcut={killAgentsShortcut} action="stop agents" />
           </Text>] : []), ...(showToggleHint ? [<Text dimColor key="toggle-tasks">
             <KeyboardShortcutHint shortcut={todosShortcut} action={toggleAction} />

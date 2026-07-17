@@ -18,6 +18,7 @@ import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isKiroModel } from '../services/api/kiro-fetch-adapter.js'
+import { getCurrentApiKeyProfile } from './apikey.js'
 
 // Layout constants
 const MAX_LEFT_WIDTH = 50
@@ -258,13 +259,15 @@ export function getLogoDisplayData(): {
   const cwd = serverUrl
     ? `${displayPath} in ${serverUrl.replace(/^https?:\/\//, '')}`
     : displayPath
-  const billingType = isClaudeAISubscriber()
-    ? getSubscriptionName()
-    : isCodexSubscriber()
-      ? 'API Billing'
-      : isKiroSubscriber()
-        ? 'Kiro Billing'
-        : 'API Usage Billing'
+  const billingType = getCurrentApiKeyProfile().ok
+    ? 'API Billing'
+    : isClaudeAISubscriber()
+      ? getSubscriptionName()
+      : isCodexSubscriber()
+        ? 'API Billing'
+        : isKiroSubscriber()
+          ? 'Kiro Billing'
+          : 'API Usage Billing'
   const agentName = getInitialSettings().agent
 
   return {
