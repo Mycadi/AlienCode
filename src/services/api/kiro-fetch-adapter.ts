@@ -299,24 +299,50 @@ function findMatchingBrace(buffer: string, start: number): number {
   return -1
 }
 
-const EVENT_PATTERNS: Array<[string, string]> = [
-  ['{"content":', 'content'],
-  ['{"name":', 'tool_start'],
-  ['{"input":', 'tool_input'],
-  ['{"stop":', 'tool_stop'],
-  ['{"followupPrompt":', 'followup'],
+// CodeWhisperer embeds newline-delimited JSON events inside an AWS
+// event-stream frame. We locate each embedded object by its opening prefix,
+// then classify it by its *fields* (not its prefix): GPT models emit tool
+// events shaped like {"input":"..fragment..","name":"X","toolUseId":"Y"},
+// where `input` leads even though the event carries name/id.
+const EVENT_PREFIXES = [
+  '{"content":',
+  '{"name":',
+  '{"input":',
+  '{"stop":',
+  '{"followupPrompt":',
 ]
 
 type KiroEvent =
   | { type: 'content'; data: string }
-  | { type: 'tool_start'; id: string; name: string; input: string }
-  | { type: 'tool_input'; input: string }
-  | { type: 'tool_stop' }
+  | {
+      type: 'tool'
+      id: string
+      name: string
+      // Present when this event carried an `input` field. Strings are streamed
+      // fragments to append; objects are complete snapshots to replace with.
+      input?: { value: string; isSnapshot: boolean }
+    }
+  | { type: 'tool_stop'; id: string }
+
+function toToolInput(input: unknown): { value: string; isSnapshot: boolean } {
+  if (typeof input === 'object' && input !== null) {
+    return {
+      value: Object.keys(input).length ? JSON.stringify(input) : '',
+      isSnapshot: true,
+    }
+  }
+  // Strings are raw JSON fragments (e.g. `{\"skill\": \"i`, `mpeccable`, `\"}`)
+  // that must be concatenated verbatim — never deduplicated, or short repeated
+  // tokens like `":` would be dropped and corrupt the final JSON.
+  return { value: typeof input === 'string' ? input : '', isSnapshot: false }
+}
 
 /** Stateful scanner turning a raw CodeWhisperer byte stream into Kiro events. */
 class KiroStreamScanner {
   private buffer = ''
   private lastContent: string | null = null
+  private currentToolId: string | null = null
+  private currentToolName = ''
 
   feed(chunk: string): KiroEvent[] {
     this.buffer += chunk
@@ -324,12 +350,10 @@ class KiroStreamScanner {
 
     for (;;) {
       let earliestPos = -1
-      let earliestType: string | null = null
-      for (const [pattern, type] of EVENT_PATTERNS) {
-        const pos = this.buffer.indexOf(pattern)
+      for (const prefix of EVENT_PREFIXES) {
+        const pos = this.buffer.indexOf(prefix)
         if (pos !== -1 && (earliestPos === -1 || pos < earliestPos)) {
           earliestPos = pos
-          earliestType = type
         }
       }
       if (earliestPos === -1) break
@@ -347,53 +371,58 @@ class KiroStreamScanner {
         continue
       }
 
-      const ev = this.processEvent(data, earliestType!)
+      const ev = this.classify(data)
       if (ev) events.push(ev)
     }
     return events
   }
 
-  private processEvent(data: Record<string, unknown>, type: string): KiroEvent | null {
-    if (type === 'content') {
-      if (data.followupPrompt) return null
-      const content = typeof data.content === 'string' ? data.content : ''
+  private classify(data: Record<string, unknown>): KiroEvent | null {
+    // A tool event is anything carrying a tool name or a toolUseId. GPT streams
+    // input fragments as {"input":"..","name":"X","toolUseId":"Y"}; the leading
+    // `input` field must not fool us into treating it as anonymous text.
+    const hasName = typeof data.name === 'string'
+    const hasToolId = typeof data.toolUseId === 'string'
+    if (hasName || hasToolId) {
+      const id = hasToolId
+        ? (data.toolUseId as string)
+        : this.currentToolId ?? randomUUID()
+      if (data.stop === true) {
+        if (id === this.currentToolId) {
+          this.currentToolId = null
+          this.currentToolName = ''
+        }
+        return { type: 'tool_stop', id }
+      }
+      const name = hasName ? (data.name as string) : this.currentToolName
+      this.currentToolId = id
+      if (name) this.currentToolName = name
+      const ev: KiroEvent = { type: 'tool', id, name }
+      if ('input' in data) ev.input = toToolInput(data.input)
+      return ev
+    }
+
+    // Some CodeWhisper variants omit name/id on continuation fragments.
+    if ('input' in data && this.currentToolId) {
+      return {
+        type: 'tool',
+        id: this.currentToolId,
+        name: this.currentToolName,
+        input: toToolInput(data.input),
+      }
+    }
+
+    // followupPrompt events are trailing suggestions, not assistant output.
+    if (data.followupPrompt) return null
+
+    if (typeof data.content === 'string') {
+      const content = data.content
       if (content === this.lastContent) return null
       this.lastContent = content
       if (!content) return null
       return { type: 'content', data: content }
     }
-    if (type === 'tool_start') {
-      const input = data.input
-      const inputStr =
-        typeof input === 'object' && input !== null
-          ? Object.keys(input).length
-            ? JSON.stringify(input)
-            : ''
-          : input
-            ? String(input)
-            : ''
-      return {
-        type: 'tool_start',
-        id: (data.toolUseId as string) ?? randomUUID(),
-        name: (data.name as string) ?? '',
-        input: inputStr,
-      }
-    }
-    if (type === 'tool_input') {
-      const input = data.input
-      const inputStr =
-        typeof input === 'object' && input !== null
-          ? Object.keys(input).length
-            ? JSON.stringify(input)
-            : ''
-          : input
-            ? String(input)
-            : ''
-      return { type: 'tool_input', input: inputStr }
-    }
-    if (type === 'tool_stop') {
-      return { type: 'tool_stop' }
-    }
+
     return null
   }
 }
@@ -421,6 +450,10 @@ function kiroStreamToAnthropic(
   let blockOpen = false
   let blockIndex = 0
   let blockKind: 'text' | 'tool' | null = null
+  let toolInput = ''
+  let sawToolUse = false
+  let currentToolId: string | null = null
+  const seenToolIds = new Set<string>()
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -448,6 +481,19 @@ function kiroStreamToAnthropic(
 
       const closeBlock = () => {
         if (!blockOpen) return
+        if (blockKind === 'tool') {
+          emit(
+            sse('content_block_delta', {
+              type: 'content_block_delta',
+              index: blockIndex,
+              delta: {
+                type: 'input_json_delta',
+                partial_json: toolInput || '{}',
+              },
+            }),
+          )
+          toolInput = ''
+        }
         emit(sse('content_block_stop', { type: 'content_block_stop', index: blockIndex }))
         blockOpen = false
         blockKind = null
@@ -479,6 +525,10 @@ function kiroStreamToAnthropic(
         )
         blockOpen = true
         blockKind = 'tool'
+        toolInput = ''
+        sawToolUse = true
+        currentToolId = id
+        seenToolIds.add(id)
       }
 
       try {
@@ -498,34 +548,33 @@ function kiroStreamToAnthropic(
                   delta: { type: 'text_delta', text: ev.data },
                 }),
               )
-            } else if (ev.type === 'tool_start') {
-              openTool(ev.id, ev.name)
-              if (ev.input) {
-                emit(
-                  sse('content_block_delta', {
-                    type: 'content_block_delta',
-                    index: blockIndex,
-                    delta: { type: 'input_json_delta', partial_json: ev.input },
-                  }),
-                )
+            } else if (ev.type === 'tool') {
+              // GPT streams a tool as an initial {name,id} start, then a run of
+              // {input,name,id} fragments, then a {name,stop,id}. Kiro sometimes
+              // replays an empty start for the same id after the real call, so
+              // opening a block must be idempotent per id -- never open a second,
+              // empty tool block that would surface as invalid parameters.
+              const isCurrent =
+                blockOpen && blockKind === 'tool' && ev.id === currentToolId
+              if (!isCurrent && !seenToolIds.has(ev.id)) {
+                openTool(ev.id, ev.name)
               }
-            } else if (ev.type === 'tool_input') {
-              if (blockOpen && blockKind === 'tool' && ev.input) {
-                emit(
-                  sse('content_block_delta', {
-                    type: 'content_block_delta',
-                    index: blockIndex,
-                    delta: { type: 'input_json_delta', partial_json: ev.input },
-                  }),
-                )
+              if (blockOpen && blockKind === 'tool' && ev.id === currentToolId) {
+                if (ev.input) {
+                  toolInput = ev.input.isSnapshot
+                    ? ev.input.value
+                    : toolInput + ev.input.value
+                }
               }
             } else if (ev.type === 'tool_stop') {
-              closeBlock()
+              if (blockOpen && blockKind === 'tool' && ev.id === currentToolId) {
+                closeBlock()
+              }
             }
           }
         }
         closeBlock()
-        const stopReason = blockKind === 'tool' ? 'tool_use' : 'end_turn'
+        const stopReason = sawToolUse ? 'tool_use' : 'end_turn'
         emit(
           sse('message_delta', {
             type: 'message_delta',
