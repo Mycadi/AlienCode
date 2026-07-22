@@ -332,24 +332,9 @@ export async function getAnthropicClient({
   const envModel = profileModel ?? process.env.ANTHROPIC_MODEL
   const adapterModel = apiKeyProfile ? model || profileModel : envModel || model
 
-  // ── OpenAI-compatible chat/completions via apikey.json ──────────────
-  if (authToken && isOpenAICompatibleChatCompletionsUrl(baseURL)) {
-    const openAICompatibleFetch = createOpenAICompatibleFetch({
-      apiKey: authToken,
-      endpoint: baseURL,
-      model: adapterModel,
-    })
-    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-      apiKey: 'openai-compatible-placeholder',
-      baseURL: 'https://api.anthropic.com',
-      ...ARGS,
-      fetch: openAICompatibleFetch,
-      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
-    }
-    return new Anthropic(clientConfig)
-  }
-
   // ── Codex (OpenAI) provider via fetch adapter ─────────────────────
+  // Must be checked before OpenAI-compatible so that Codex models use
+  // their own OAuth token instead of an apikey profile's credentials.
   if (isCodexSubscriber() && model && isCodexModel(model)) {
     const codexTokens = getCodexOAuthTokens()
     if (codexTokens?.accessToken) {
@@ -365,6 +350,8 @@ export async function getAnthropicClient({
   }
 
   // ── Kiro (AWS CodeWhisperer) provider via fetch adapter ───────────
+  // Must be checked before OpenAI-compatible so that Kiro models use
+  // their own OAuth token instead of an apikey profile's credentials.
   if (isKiroSubscriber() && model && isKiroModel(model)) {
     const kiroTokens = getKiroOAuthTokens()
     if (kiroTokens?.accessToken) {
@@ -380,6 +367,8 @@ export async function getAnthropicClient({
   }
 
   // ── OpenCode Zen free models via public fetch adapter ────────────────
+  // Must be checked before OpenAI-compatible so that free models use
+  // their own public auth instead of an apikey profile's credentials.
   if (model && isOpenCodeZenFreeModel(model)) {
     const openCodeZenFetch = createOpenCodeZenFetch()
     const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
@@ -387,6 +376,23 @@ export async function getAnthropicClient({
       baseURL: 'https://api.anthropic.com', // ignore user ANTHROPIC_BASE_URL for OpenCode free models
       ...ARGS,
       fetch: openCodeZenFetch as unknown as typeof globalThis.fetch,
+      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+    }
+    return new Anthropic(clientConfig)
+  }
+
+  // ── OpenAI-compatible chat/completions via apikey.json ──────────────
+  if (authToken && isOpenAICompatibleChatCompletionsUrl(baseURL)) {
+    const openAICompatibleFetch = createOpenAICompatibleFetch({
+      apiKey: authToken,
+      endpoint: baseURL,
+      model: adapterModel,
+    })
+    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
+      apiKey: 'openai-compatible-placeholder',
+      baseURL: 'https://api.anthropic.com',
+      ...ARGS,
+      fetch: openAICompatibleFetch,
       ...(isDebugToStdErr() && { logger: createStderrLogger() }),
     }
     return new Anthropic(clientConfig)
