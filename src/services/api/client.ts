@@ -90,6 +90,13 @@ import {
  * 4. Fallback region (us-east5)
  */
 
+export function resolveAdapterModel(
+  model: string | undefined,
+  configuredModel: string | undefined,
+): string | undefined {
+  return model || configuredModel
+}
+
 function createStderrLogger(): ClientOptions['logger'] {
   return {
     error: (msg, ...args) =>
@@ -330,7 +337,7 @@ export async function getAnthropicClient({
   const authToken = profileAuthToken ?? process.env.ANTHROPIC_AUTH_TOKEN
   const baseURL = profileBaseURL ?? process.env.ANTHROPIC_BASE_URL
   const envModel = profileModel ?? process.env.ANTHROPIC_MODEL
-  const adapterModel = apiKeyProfile ? model || profileModel : envModel || model
+  const adapterModel = resolveAdapterModel(model, envModel)
 
   // ── Codex (OpenAI) provider via fetch adapter ─────────────────────
   // Must be checked before OpenAI-compatible so that Codex models use
