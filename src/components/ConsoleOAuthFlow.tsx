@@ -683,7 +683,7 @@ function OAuthStatusMessage(t0) {
           : loginWithCodex
             ? "Available models: GPT-5.5, GPT-5.4, GPT-5.3 Codex, GPT-5.4 Mini"
             : loginWithKiro
-              ? "Available models: claude-sonnet-5, claude-opus-4.8, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna"
+              ? "Available models: claude-sonnet-5, claude-opus-4.8, claude-opus-5, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna"
               : null;
         let t2;
         if ($[43] !== t1 || $[44] !== availableModelsText) {

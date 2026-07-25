@@ -34,6 +34,7 @@ import { logError } from '../../utils/log.js'
 export const KIRO_MODELS = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', description: 'Kiro · 1.30x credits' },
   { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', description: 'Kiro · 2.20x credits' },
+  { id: 'claude-opus-5', label: 'Claude Opus 5', description: 'Kiro · 2.20x credits' },
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Kiro · 2.40x credits' },
   { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Kiro · 1.20x credits' },
   { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Kiro · 0.60x credits' },
