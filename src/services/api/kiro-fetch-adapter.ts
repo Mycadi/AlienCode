@@ -29,6 +29,7 @@ import { getKiroOAuthTokens, saveKiroOAuthTokens } from '../../utils/auth.js'
 import { refreshKiroToken } from '../oauth/kiro-client.js'
 import { getCwd } from '../../utils/cwd.js'
 import { logError } from '../../utils/log.js'
+import { roughTokenCountEstimation } from '../tokenEstimation.js'
 
 // ── Available Kiro models ───────────────────────────────────────────
 export const KIRO_MODELS = [
@@ -177,6 +178,17 @@ type KiroPayload = {
     history?: Array<Record<string, unknown>>
   }
   profileArn?: string
+}
+
+function estimateAnthropicInputTokens(
+  anthropicBody: Record<string, unknown>,
+): number {
+  const countableInput = {
+    system: anthropicBody.system,
+    messages: anthropicBody.messages,
+    tools: anthropicBody.tools,
+  }
+  return roughTokenCountEstimation(JSON.stringify(countableInput))
 }
 
 function translateToKiroBody(anthropicBody: Record<string, unknown>): {
@@ -441,6 +453,7 @@ function sse(event: string, data: unknown): string {
 function kiroStreamToAnthropic(
   upstream: ReadableStream<Uint8Array>,
   model: string,
+  inputTokens: number,
 ): ReadableStream<Uint8Array> {
   const scanner = new KiroStreamScanner()
   const decoder = new TextDecoder()
@@ -452,6 +465,7 @@ function kiroStreamToAnthropic(
   let blockIndex = 0
   let blockKind: 'text' | 'tool' | null = null
   let toolInput = ''
+  let outputContent = ''
   let sawToolUse = false
   let currentToolId: string | null = null
   const seenToolIds = new Set<string>()
@@ -474,7 +488,7 @@ function kiroStreamToAnthropic(
               content: [],
               stop_reason: null,
               stop_sequence: null,
-              usage: { input_tokens: 0, output_tokens: 0 },
+              usage: { input_tokens: inputTokens, output_tokens: 0 },
             },
           }),
         )
@@ -483,16 +497,18 @@ function kiroStreamToAnthropic(
       const closeBlock = () => {
         if (!blockOpen) return
         if (blockKind === 'tool') {
+          const finalToolInput = toolInput || '{}'
           emit(
             sse('content_block_delta', {
               type: 'content_block_delta',
               index: blockIndex,
               delta: {
                 type: 'input_json_delta',
-                partial_json: toolInput || '{}',
+                partial_json: finalToolInput,
               },
             }),
           )
+          outputContent += finalToolInput
           toolInput = ''
         }
         emit(sse('content_block_stop', { type: 'content_block_stop', index: blockIndex }))
@@ -527,6 +543,7 @@ function kiroStreamToAnthropic(
         blockOpen = true
         blockKind = 'tool'
         toolInput = ''
+        outputContent += name
         sawToolUse = true
         currentToolId = id
         seenToolIds.add(id)
@@ -542,6 +559,7 @@ function kiroStreamToAnthropic(
           for (const ev of events) {
             if (ev.type === 'content') {
               openText()
+              outputContent += ev.data
               emit(
                 sse('content_block_delta', {
                   type: 'content_block_delta',
@@ -576,11 +594,14 @@ function kiroStreamToAnthropic(
         }
         closeBlock()
         const stopReason = sawToolUse ? 'tool_use' : 'end_turn'
+        const outputTokens = outputContent
+          ? Math.max(1, roughTokenCountEstimation(outputContent))
+          : 0
         emit(
           sse('message_delta', {
             type: 'message_delta',
             delta: { stop_reason: stopReason, stop_sequence: null },
-            usage: { output_tokens: 0 },
+            usage: { output_tokens: outputTokens },
           }),
         )
         emit(sse('message_stop', { type: 'message_stop' }))
@@ -680,7 +701,12 @@ export function createKiroFetch(
       })
     }
 
-    const anthropicStream = kiroStreamToAnthropic(response.body, requestedModel)
+    const inputTokens = estimateAnthropicInputTokens(anthropicBody)
+    const anthropicStream = kiroStreamToAnthropic(
+      response.body,
+      requestedModel,
+      inputTokens,
+    )
     return new Response(anthropicStream, {
       status: 200,
       headers: { 'Content-Type': 'text/event-stream' },

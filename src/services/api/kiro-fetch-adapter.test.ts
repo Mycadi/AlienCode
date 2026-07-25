@@ -63,12 +63,35 @@ function toolBlocks(stream: string): Array<{ name: string; input: unknown }> {
     return { name: start.content_block.name, input: JSON.parse(input) }
   })
 }
+function usage(stream: string): { inputTokens: number; outputTokens: number } {
+  const events = sseData(stream)
+  const messageStart = events.find(event => event.type === 'message_start')
+  const messageDelta = events.find(event => event.type === 'message_delta')
+  return {
+    inputTokens: messageStart?.message?.usage?.input_tokens ?? 0,
+    outputTokens: messageDelta?.usage?.output_tokens ?? 0,
+  }
+}
 
 afterEach(() => {
   globalThis.fetch = originalFetch
 })
 
 describe('Kiro tool-call stream translation', () => {
+  test('reports estimated usage for a text response', async () => {
+    const stream = await translate([{ content: 'Here is my answer.' }])
+    const estimatedUsage = usage(stream)
+    expect(estimatedUsage.inputTokens).toBeGreaterThan(0)
+    expect(estimatedUsage.outputTokens).toBeGreaterThan(0)
+  })
+  test('reports estimated output usage for a tool response', async () => {
+    const stream = await translate([
+      { name: 'Read', toolUseId: 'call-1' },
+      { input: '{"file_path":"a.ts"}', name: 'Read', toolUseId: 'call-1' },
+      { name: 'Read', stop: true, toolUseId: 'call-1' },
+    ])
+    expect(usage(stream).outputTokens).toBeGreaterThan(0)
+  })
   test('assembles GPT string fragments carrying name and toolUseId', async () => {
     const stream = await translate([
       { name: 'Read', toolUseId: 'call-1' },
