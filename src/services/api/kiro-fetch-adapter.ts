@@ -42,6 +42,9 @@ export const KIRO_MODELS = [
 ] as const
 
 export const DEFAULT_KIRO_MODEL = 'claude-sonnet-5'
+const DEFAULT_KIRO_STREAM_IDLE_TIMEOUT_MS = 60_000
+const KIRO_OPUS_5_LARGE_TOOL_INPUT_GUARD =
+  'IMPORTANT Kiro tool-call reliability rule: Every Write or Edit call MUST have a complete serialized JSON input of at most 3000 characters. Inputs above this limit can be truncated and fail. NEVER put more than 1800 characters in content or new_string. For larger files, MUST use one small Write followed by multiple sequential small Edit calls. NEVER place a large file in one Write call.'
 
 export function isKiroModel(model: string): boolean {
   return KIRO_MODELS.some((m) => m.id === model)
@@ -159,15 +162,45 @@ function extractToolUses(
   return out
 }
 
-function convertTools(tools: AnthropicTool[] | undefined) {
+function convertTools(
+  tools: AnthropicTool[] | undefined,
+  guardLargeToolInput = false,
+) {
   if (!tools?.length) return undefined
-  return tools.map((t) => ({
-    toolSpecification: {
-      name: t.name,
-      description: t.description?.trim() || `Tool: ${t.name}`,
-      inputSchema: { json: t.input_schema ?? {} },
-    },
-  }))
+  return tools.map((t) => {
+    const inputSchema = t.input_schema ?? {}
+    const limits = guardLargeToolInput
+      ? t.name === 'Write'
+        ? { content: 1800 }
+        : t.name === 'Edit'
+          ? { old_string: 800, new_string: 1800 }
+          : undefined
+      : undefined
+    const properties = inputSchema.properties
+    const limitedProperties =
+      limits && properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? Object.fromEntries(
+            Object.entries(properties).map(([name, schema]) => [
+              name,
+              name in limits && schema && typeof schema === 'object' && !Array.isArray(schema)
+                ? { ...schema, maxLength: limits[name as keyof typeof limits] }
+                : schema,
+            ]),
+          )
+        : undefined
+
+    return {
+      toolSpecification: {
+        name: t.name,
+        description: t.description?.trim() || `Tool: ${t.name}`,
+        inputSchema: {
+          json: limitedProperties
+            ? { ...inputSchema, properties: limitedProperties }
+            : inputSchema,
+        },
+      },
+    }
+  })
 }
 
 type KiroPayload = {
@@ -197,6 +230,12 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
 } {
   const modelId = mapClaudeModelToKiro((anthropicBody.model as string) ?? null)
   const messages = (anthropicBody.messages as AnthropicMessage[]) ?? []
+  const tools = (anthropicBody.tools as AnthropicTool[] | undefined) ?? []
+  const toolNames = new Set(tools.map(tool => tool.name))
+  const shouldGuardLargeToolInput =
+    modelId === 'claude-opus-5' &&
+    toolNames.has('Write') &&
+    toolNames.has('Edit')
   const systemText =
     typeof anthropicBody.system === 'string'
       ? anthropicBody.system
@@ -211,6 +250,11 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
     agentsMd && !systemText.includes(agentsMd)
       ? `${agentsMd}\n\n${systemText}`.trim()
       : systemText
+  const systemWithGuard =
+    shouldGuardLargeToolInput &&
+    !systemWithAgents.includes(KIRO_OPUS_5_LARGE_TOOL_INPUT_GUARD)
+      ? `${systemWithAgents}\n\n${KIRO_OPUS_5_LARGE_TOOL_INPUT_GUARD}`.trim()
+      : systemWithAgents
 
   // The last message is the "current" one; the rest becomes history.
   const current = messages[messages.length - 1]
@@ -219,10 +263,10 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
   const history: Array<Record<string, unknown>> = []
   // Prepend the system prompt as the first user turn (CodeWhisperer has no
   // dedicated system field).
-  if (systemWithAgents) {
+  if (systemWithGuard) {
     history.push({
       userInputMessage: {
-        content: systemWithAgents,
+        content: systemWithGuard,
         modelId,
         origin: 'AI_EDITOR',
       },
@@ -258,7 +302,7 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
 
   // Build the current userInputMessage.
   const currentContext: Record<string, unknown> = {}
-  const kiroTools = convertTools(anthropicBody.tools as AnthropicTool[] | undefined)
+  const kiroTools = convertTools(tools, shouldGuardLargeToolInput)
   if (kiroTools) currentContext.tools = kiroTools
   const currentToolResults = extractToolResults(current?.content)
   if (currentToolResults.length) currentContext.toolResults = currentToolResults
@@ -440,6 +484,29 @@ class KiroStreamScanner {
   }
 }
 
+type KiroStreamDiagnostic = {
+  chunkCount: number
+  byteCount: number
+  unrecognizedChunkCount: number
+  recentChunks: Array<{ bytes: number; events: string[] }>
+  lastActivityAt: number
+}
+
+function summarizeKiroStreamDiagnostic(
+  model: string,
+  diagnostic: KiroStreamDiagnostic,
+): string {
+  const idleMs = Date.now() - diagnostic.lastActivityAt
+  return [
+    `model=${model}`,
+    `chunks=${diagnostic.chunkCount}`,
+    `bytes=${diagnostic.byteCount}`,
+    `unrecognizedChunks=${diagnostic.unrecognizedChunkCount}`,
+    `idleMs=${idleMs}`,
+    `recent=${JSON.stringify(diagnostic.recentChunks)}`,
+  ].join(' ')
+}
+
 // ── Anthropic SSE emission ──────────────────────────────────────────
 
 function sse(event: string, data: unknown): string {
@@ -454,6 +521,7 @@ function kiroStreamToAnthropic(
   upstream: ReadableStream<Uint8Array>,
   model: string,
   inputTokens: number,
+  idleTimeoutMs: number,
 ): ReadableStream<Uint8Array> {
   const scanner = new KiroStreamScanner()
   const decoder = new TextDecoder()
@@ -469,6 +537,13 @@ function kiroStreamToAnthropic(
   let sawToolUse = false
   let currentToolId: string | null = null
   const seenToolIds = new Set<string>()
+  const diagnostic: KiroStreamDiagnostic = {
+    chunkCount: 0,
+    byteCount: 0,
+    unrecognizedChunkCount: 0,
+    recentChunks: [],
+    lastActivityAt: Date.now(),
+  }
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -552,10 +627,34 @@ function kiroStreamToAnthropic(
       try {
         ensureStart()
         const reader = upstream.getReader()
+        let timedOut = false
         for (;;) {
-          const { done, value } = await reader.read()
+          let timeoutId: ReturnType<typeof setTimeout> | undefined
+          const idleTimeout = new Promise<null>(resolve => {
+            timeoutId = setTimeout(() => resolve(null), idleTimeoutMs)
+          })
+          const result = await Promise.race([reader.read(), idleTimeout])
+          if (timeoutId) clearTimeout(timeoutId)
+          if (result === null) {
+            timedOut = true
+            logError(
+              new Error(
+                `Kiro response stream idle timeout: ${summarizeKiroStreamDiagnostic(model, diagnostic)}`,
+              ),
+            )
+            await reader.cancel('Kiro response stream idle timeout').catch(() => {})
+            break
+          }
+          const { done, value } = result
           if (done) break
+          diagnostic.chunkCount++
+          diagnostic.byteCount += value.byteLength
+          diagnostic.lastActivityAt = Date.now()
           const events = scanner.feed(decoder.decode(value, { stream: true }))
+          const eventTypes = events.map(event => event.type)
+          if (!eventTypes.length) diagnostic.unrecognizedChunkCount++
+          diagnostic.recentChunks.push({ bytes: value.byteLength, events: eventTypes })
+          if (diagnostic.recentChunks.length > 8) diagnostic.recentChunks.shift()
           for (const ev of events) {
             if (ev.type === 'content') {
               openText()
@@ -592,6 +691,13 @@ function kiroStreamToAnthropic(
             }
           }
         }
+        if (timedOut && blockOpen && blockKind === 'tool') {
+          try {
+            JSON.parse(toolInput || '{}')
+          } catch {
+            throw new Error('Kiro response stream timed out with incomplete tool input')
+          }
+        }
         closeBlock()
         const stopReason = sawToolUse ? 'tool_use' : 'end_turn'
         const outputTokens = outputContent
@@ -607,7 +713,14 @@ function kiroStreamToAnthropic(
         emit(sse('message_stop', { type: 'message_stop' }))
         controller.close()
       } catch (err) {
-        logError(err as Error)
+        const cause = err instanceof Error
+          ? `${err.name}: ${err.message}`
+          : 'Unknown stream error'
+        logError(
+          new Error(
+            `Kiro response stream failed (${cause}): ${summarizeKiroStreamDiagnostic(model, diagnostic)}`,
+          ),
+        )
         controller.error(err)
       }
     },
@@ -619,20 +732,32 @@ function kiroStreamToAnthropic(
 async function callCodeWhisperer(
   payload: KiroPayload,
   accessToken: string,
+  modelId: string,
 ): Promise<Response> {
-  return globalThis.fetch(KIRO_CODEWHISPERER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-amz-json-1.1',
-      Accept: 'text/event-stream',
-      Authorization: `Bearer ${accessToken}`,
-      // Must be the real User-Agent (not x-amz-user-agent) and contain
-      // `KiroIDE`, or Enterprise accounts get "subscription does not support
-      // this application".
-      'User-Agent': KIRO_IDE_USER_AGENT,
-    },
-    body: JSON.stringify(payload),
-  })
+  try {
+    return await globalThis.fetch(KIRO_CODEWHISPERER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        Accept: 'text/event-stream',
+        Authorization: `Bearer ${accessToken}`,
+        // Must be the real User-Agent (not x-amz-user-agent) and contain
+        // `KiroIDE`, or Enterprise accounts get "subscription does not support
+        // this application".
+        'User-Agent': KIRO_IDE_USER_AGENT,
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (err) {
+    const cause = err instanceof Error
+      ? `${err.name}: ${err.message}`
+      : 'Unknown transport error'
+    const diagnostic = new Error(
+      `Kiro transport request failed (modelId=${modelId}): ${cause}`,
+    )
+    logError(diagnostic)
+    throw diagnostic
+  }
 }
 
 /**
@@ -642,7 +767,11 @@ async function callCodeWhisperer(
  */
 export function createKiroFetch(
   accessToken: string,
+  options?: { streamIdleTimeoutMs?: number },
 ): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
+  const streamIdleTimeoutMs =
+    options?.streamIdleTimeoutMs ?? DEFAULT_KIRO_STREAM_IDLE_TIMEOUT_MS
+
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = input instanceof Request ? input.url : String(input)
 
@@ -664,12 +793,12 @@ export function createKiroFetch(
       anthropicBody = {}
     }
 
-    const { payload } = translateToKiroBody(anthropicBody)
+    const { payload, modelId } = translateToKiroBody(anthropicBody)
     const requestedModel = (anthropicBody.model as string) ?? DEFAULT_KIRO_MODEL
 
     // Use the freshest token (may have been refreshed elsewhere).
     let currentToken = getKiroOAuthTokens()?.accessToken || accessToken
-    let response = await callCodeWhisperer(payload, currentToken)
+    let response = await callCodeWhisperer(payload, currentToken, modelId)
 
     // On auth failure, refresh via the stored refresh token and retry once.
     if (response.status === 401 || response.status === 403) {
@@ -679,7 +808,7 @@ export function createKiroFetch(
           const refreshed = await refreshKiroToken(stored)
           saveKiroOAuthTokens(refreshed)
           currentToken = refreshed.accessToken
-          response = await callCodeWhisperer(payload, currentToken)
+          response = await callCodeWhisperer(payload, currentToken, modelId)
         } catch (err) {
           logError(err as Error)
         }
@@ -706,6 +835,7 @@ export function createKiroFetch(
       response.body,
       requestedModel,
       inputTokens,
+      streamIdleTimeoutMs,
     )
     return new Response(anthropicStream, {
       status: 200,
