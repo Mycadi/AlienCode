@@ -705,6 +705,18 @@ async function getMessagesForSlashCommand(commandName: string, args: string, set
             }
 
             // Text result — use system message so it doesn't render as a user bubble
+            if (result.type === 'autostart') {
+              // Autostart: show the command result, then auto-query with the prompt text
+              return {
+                messages: [userMessage, createCommandInputMessage(`<local-command-stdout>${result.value}</local-command-stdout>`), createUserMessage({
+                  content: result.promptText
+                })],
+                shouldQuery: true,
+                command,
+                resultText: result.value
+              };
+            }
+
             return {
               messages: [userMessage, createCommandInputMessage(`<local-command-stdout>${result.value}</local-command-stdout>`)],
               shouldQuery: false,

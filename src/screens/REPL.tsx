@@ -880,6 +880,10 @@ export function REPL({
   // read in onQueryImpl to schedule the next loop iteration.
   const loopTriggerRef = useRef<((taskText: string) => void) | null>(null);
 
+  // Ref for goal auto-trigger — set after onSubmit is defined,
+  // read in onQueryImpl to auto-continue toward the goal.
+  const goalTriggerRef = useRef<((goalText: string) => void) | null>(null);
+
   // Ref for the synchronous restore callback — set after restoreMessageSync is
   // defined, read in the onQuery finally block for auto-restore on interrupt.
   const restoreMessageSyncRef = useRef<(m: UserMessage) => void>(() => {});
@@ -2927,6 +2931,12 @@ export function REPL({
             }
           }
         }
+
+        // Auto-continue: if goal is still active, trigger the next turn
+        const updatedGoal = getGoal();
+        if (updatedGoal && !updatedGoal.isCompleted) {
+          goalTriggerRef.current?.(updatedGoal.goalText);
+        }
       }
     }
 
@@ -3728,6 +3738,15 @@ export function REPL({
   // Wire loopTriggerRef to onSubmit so onQueryImpl can schedule loop iterations
   loopTriggerRef.current = (taskText: string) => {
     void onSubmitRef.current(`Continue the loop task: ${taskText}`, {
+      setCursorOffset: () => {},
+      clearBuffer: () => {},
+      resetHistory: () => {},
+    });
+  };
+
+  // Wire goalTriggerRef to onSubmit so onQueryImpl can auto-continue toward the goal
+  goalTriggerRef.current = (goalText: string) => {
+    void onSubmitRef.current(`Continue working toward the goal: ${goalText}`, {
       setCursorOffset: () => {},
       clearBuffer: () => {},
       resetHistory: () => {},

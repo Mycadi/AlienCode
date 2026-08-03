@@ -501,6 +501,20 @@ function ModeIndicator({
       {modelName}{sourceName ? ` · ${sourceName}` : ''}
     </Text>);
 
+  // Goal/Loop status indicator
+  {
+    const { getGoal } = require('../../commands/goal/goalState.js') as typeof import('../../commands/goal/goalState.js');
+    const { getLoop } = require('../../commands/loop/loopState.js') as typeof import('../../commands/loop/loopState.js');
+    const goal = getGoal();
+    const loop = getLoop();
+    if (goal && !goal.isCompleted) {
+      parts.push(<Text color="yellow" key="goal-status">goal</Text>);
+    }
+    if (loop && !loop.isStopped) {
+      parts.push(<Text color="cyan" key="loop-status">loop</Text>);
+    }
+  }
+
   // In fullscreen the bottom section is flexShrink:0 — every row here
   // is a row stolen from the ScrollBox. This component must have a STABLE
   // height so the footer never grows/shrinks and shifts scroll content.

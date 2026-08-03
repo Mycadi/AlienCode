@@ -2314,6 +2314,18 @@ function runHeadlessStreaming(
                   }
                 }
               }
+
+              // Auto-continue: if goal is still active, enqueue the next turn
+              const updatedGoal = getGoal()
+              if (updatedGoal && !updatedGoal.isCompleted && !inputClosed) {
+                enqueue({
+                  mode: 'prompt' as const,
+                  value: `Continue working toward the goal: ${updatedGoal.goalText}`,
+                  uuid: randomUUID(),
+                  priority: 'later',
+                })
+                void run()
+              }
             }
           }
 

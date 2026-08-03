@@ -21,6 +21,7 @@ export type LocalCommandResult =
       displayText?: string
     }
   | { type: 'skip' } // Skip messages
+  | { type: 'autostart'; value: string; promptText: string } // Display value then auto-query with promptText
 
 export type PromptCommand = {
   type: 'prompt'

@@ -90,7 +90,8 @@ export async function call(args: string): Promise<LocalCommandResult> {
   )
 
   return {
-    type: 'text',
+    type: 'autostart',
     value: `Loop started: ${parsed.taskText} (every ${parsed.intervalMinutes} min)`,
+    promptText: parsed.taskText,
   }
 }

@@ -50,7 +50,7 @@ export async function call(args: string): Promise<LocalCommandResult> {
   const trimmed = args.trim().toLowerCase()
 
   // Cancel active goal
-  if (trimmed === 'off' || trimmed === 'clear' || trimmed === 'cancel') {
+  if (trimmed === 'off' || trimmed === 'stop' || trimmed === 'clear' || trimmed === 'cancel') {
     const existing = getGoal()
     if (existing) {
       clearGoal()
@@ -97,7 +97,8 @@ export async function call(args: string): Promise<LocalCommandResult> {
 
   const limits = formatLimits(parsed.maxTurns, parsed.maxMinutes)
   return {
-    type: 'text',
+    type: 'autostart',
     value: `Goal set: ${parsed.goalText}${limits}`,
+    promptText: parsed.goalText,
   }
 }
