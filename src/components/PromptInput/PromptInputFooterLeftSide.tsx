@@ -390,13 +390,9 @@ function ModeIndicator({
   // Get hint parts separately for potential second-line rendering
   const hintParts = showHint ? getSpinnerHintParts(isLoading, escShortcut, todosShortcut, killAgentsShortcut, hasTaskItems, expandedView, hasAnyInProcessTeammates, hasRunningAgentTasks, isKillAgentsConfirmShowing) : [];
   if (isViewingCompletedTeammate) {
-    parts.push(<Text dimColor key="esc-return">
-        <KeyboardShortcutHint shortcut={escShortcut} action="return to team lead" />
-      </Text>);
+    // no-op: removed keyboard hint
   } else if ((feature('PROACTIVE') || feature('KAIROS')) && hasNextTick) {
     parts.push(<ProactiveCountdown key="proactive" />);
-  } else if (!hasTeammatePills && showHint) {
-    parts.push(...hintParts);
   }
 
   // Context usage indicator (for teammate pills path, which returns early below)
@@ -420,7 +416,7 @@ function ModeIndicator({
   if (hasTeammatePills) {
     // Don't append spinner hints when viewing a completed teammate —
     // the "esc to return to team lead" hint already replaces "esc to interrupt"
-    const otherParts = [...(modePart ? [modePart] : []), ...parts, ...(isViewingCompletedTeammate ? [] : hintParts)];
+    const otherParts = [...(modePart ? [modePart] : []), ...parts];
     return <Box flexDirection="column">
         <Box>
           <BackgroundTaskStatus tasksSelected={tasksSelected} isViewingTeammate={isViewingTeammate} teammateFooterIndex={teammateFooterIndex} isLeaderIdle={!isLoading} onOpenDialog={onOpenTasksDialog} />
@@ -439,52 +435,6 @@ function ModeIndicator({
   // reconciler throws on Box-in-Text. Computed here so the empty-checks
   // below still treat "pill present" as non-empty.
   const tasksPart = hasBackgroundTasks && !hasTeammatePills && !shouldHideTasksFooter(tasks, showSpinnerTree) ? <BackgroundTaskStatus tasksSelected={tasksSelected} isViewingTeammate={isViewingTeammate} teammateFooterIndex={teammateFooterIndex} isLeaderIdle={!isLoading} onOpenDialog={onOpenTasksDialog} /> : null;
-  if (parts.length === 0 && !tasksPart && !modePart && showHint) {
-    parts.push(<Text dimColor key="shortcuts-hint">
-        ? for shortcuts
-      </Text>);
-  }
-
-  // Only replace the idle voice hint when there's something to say — otherwise
-  // fall through instead of showing an empty Byline. "esc to clear" was removed
-  // (looked like "esc to interrupt" when idle; esc-clears-selection is standard
-  // UX) leaving only ctrl+c (copyOnSelect off) and the xterm.js native-select hint.
-  const copyOnSelect = getGlobalConfig().copyOnSelect ?? true;
-  const selectionHintHasContent = hasSelection && (!copyOnSelect || isXtermJs());
-
-  // Warmup hint takes priority — when the user is actively holding
-  // the activation key, show feedback regardless of other hints.
-  if (feature('VOICE_MODE') && voiceEnabled && voiceWarmingUp) {
-    parts.push(<VoiceWarmupHint key="voice-warmup" />);
-  } else if (isFullscreenEnvEnabled() && selectionHintHasContent) {
-    // xterm.js (VS Code/Cursor/Windsurf) force-selection modifier is
-    // platform-specific and gated on macOS (SelectionService.shouldForceSelection):
-    //   macOS:     altKey && macOptionClickForcesSelection (VS Code default: false)
-    //   non-macOS: shiftKey
-    // On macOS, if we RECEIVED an alt+click (lastPressHadAlt), the VS Code
-    // setting is off — xterm.js would have consumed the event otherwise.
-    // Tell the user the exact setting to flip instead of repeating the
-    // option+click hint they just tried.
-    // Non-reactive getState() read is safe: lastPressHadAlt is immutable
-    // while hasSelection is true (set pre-drag, cleared with selection).
-    const isMac = getPlatform() === 'macos';
-    const altClickFailed = isMac && (selGetState()?.lastPressHadAlt ?? false);
-    parts.push(<Text dimColor key="selection-copy">
-        <Byline>
-          {!copyOnSelect && <KeyboardShortcutHint shortcut="ctrl+c" action="copy" />}
-          {isXtermJs() && (altClickFailed ? <Text>set macOptionClickForcesSelection in VS Code settings</Text> : <KeyboardShortcutHint shortcut={isMac ? 'option+click' : 'shift+click'} action="native select" />)}
-        </Byline>
-      </Text>);
-  } else if (feature('VOICE_MODE') && parts.length > 0 && showHint && voiceEnabled && voiceState === 'idle' && hintParts.length === 0 && voiceHintUnderCap) {
-    parts.push(<Text dimColor key="voice-hint">
-        hold {voiceKeyShortcut} to speak
-      </Text>);
-  }
-  if ((tasksPart || hasCoordinatorTasks) && showHint && !hasTeams) {
-    parts.push(<Text dimColor key="manage-tasks">
-        {tasksSelected ? <KeyboardShortcutHint shortcut="Enter" action="view tasks" /> : <KeyboardShortcutHint shortcut="↓" action="manage" />}
-      </Text>);
-  }
 
   // Context usage indicator
   if (contextUsagePercent !== null) {
