@@ -128,8 +128,29 @@ function extractImages(
   return out
 }
 
+const KIRO_TOOL_USE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
+
+/**
+ * CodeWhisperer rejects tool ids that do not match ^[a-zA-Z0-9_-]+$ with a 400
+ * TOOL_SCHEMA_INVALID. History replayed from other providers can carry ids like
+ * `Bash:209`, so illegal ids are rewritten. The mapping is shared across one
+ * request so a tool_use and its tool_result keep pointing at the same id.
+ */
+function sanitizeToolUseId(id: string, mapping: Map<string, string>): string {
+  if (KIRO_TOOL_USE_ID_PATTERN.test(id)) return id
+  const existing = mapping.get(id)
+  if (existing) return existing
+  let sanitized = id.replace(/[^a-zA-Z0-9_-]/g, '_') || 'tool'
+  if (new Set(mapping.values()).has(sanitized)) {
+    sanitized = `${sanitized}_${mapping.size}`
+  }
+  mapping.set(id, sanitized)
+  return sanitized
+}
+
 function extractToolResults(
   content: string | AnthropicContentBlock[] | undefined,
+  toolIdMapping: Map<string, string>,
 ): Array<{ toolUseId: string; content: Array<{ text: string }>; status: string }> {
   if (!Array.isArray(content)) return []
   const out: Array<{ toolUseId: string; content: Array<{ text: string }>; status: string }> = []
@@ -140,7 +161,7 @@ function extractToolResults(
           ? b.content
           : extractText(b.content as AnthropicContentBlock[]) || '(empty result)'
       out.push({
-        toolUseId: b.tool_use_id,
+        toolUseId: sanitizeToolUseId(b.tool_use_id, toolIdMapping),
         content: [{ text }],
         status: 'success',
       })
@@ -151,12 +172,17 @@ function extractToolResults(
 
 function extractToolUses(
   content: string | AnthropicContentBlock[] | undefined,
+  toolIdMapping: Map<string, string>,
 ): Array<{ toolUseId: string; name: string; input: unknown }> {
   if (!Array.isArray(content)) return []
   const out: Array<{ toolUseId: string; name: string; input: unknown }> = []
   for (const b of content) {
     if (b.type === 'tool_use' && b.id && b.name) {
-      out.push({ toolUseId: b.id, name: b.name, input: b.input ?? {} })
+      out.push({
+        toolUseId: sanitizeToolUseId(b.id, toolIdMapping),
+        name: b.name,
+        input: b.input ?? {},
+      })
     }
   }
   return out
@@ -229,6 +255,9 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
   modelId: string
 } {
   const modelId = mapClaudeModelToKiro((anthropicBody.model as string) ?? null)
+  // Shared across this request so tool_use ids and their tool_result references
+  // are rewritten consistently.
+  const toolIdMapping = new Map<string, string>()
   const messages = (anthropicBody.messages as AnthropicMessage[]) ?? []
   const tools = (anthropicBody.tools as AnthropicTool[] | undefined) ?? []
   const toolNames = new Set(tools.map(tool => tool.name))
@@ -285,7 +314,7 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
       }
       const images = extractImages(msg.content)
       if (images.length) userInput.images = images
-      const toolResults = extractToolResults(msg.content)
+      const toolResults = extractToolResults(msg.content, toolIdMapping)
       if (toolResults.length) {
         userInput.userInputMessageContext = { toolResults }
       }
@@ -294,7 +323,7 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
       const assistant: Record<string, unknown> = {
         content: extractText(msg.content) || '(empty placeholder)',
       }
-      const toolUses = extractToolUses(msg.content)
+      const toolUses = extractToolUses(msg.content, toolIdMapping)
       if (toolUses.length) assistant.toolUses = toolUses
       history.push({ assistantResponseMessage: assistant })
     }
@@ -304,7 +333,7 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
   const currentContext: Record<string, unknown> = {}
   const kiroTools = convertTools(tools, shouldGuardLargeToolInput)
   if (kiroTools) currentContext.tools = kiroTools
-  const currentToolResults = extractToolResults(current?.content)
+  const currentToolResults = extractToolResults(current?.content, toolIdMapping)
   if (currentToolResults.length) currentContext.toolResults = currentToolResults
 
   const userInputMessage: Record<string, unknown> = {
