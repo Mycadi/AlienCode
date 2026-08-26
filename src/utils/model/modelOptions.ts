@@ -36,6 +36,7 @@ import { KIRO_MODELS } from '../../services/api/kiro-fetch-adapter.js'
 import {
   formatApiKeyModelRef,
   getActiveApiKeyProfileName,
+  isInactiveApiKeyModelRef,
   listApiKeyProfileModels,
 } from '../apikey.js'
 
@@ -469,7 +470,8 @@ export function getModelOptions(fastMode = false): ModelOption[] {
   }
 
   // Add custom model from either the current model value or the initial one
-  // if it is not already in the options.
+  // if it is not already in the options. An `apikey:` ref left over from a
+  // profile that /apikey has since switched away from is dropped instead.
   let customModel: ModelSetting = null
   const currentMainLoopModel = getUserSpecifiedModelSetting()
   const initialMainLoopModel = getInitialMainLoopModel()
@@ -478,7 +480,11 @@ export function getModelOptions(fastMode = false): ModelOption[] {
   } else if (initialMainLoopModel !== null) {
     customModel = initialMainLoopModel
   }
-  if (customModel === null || options.some(opt => opt.value === customModel)) {
+  if (
+    customModel === null ||
+    isInactiveApiKeyModelRef(customModel) ||
+    options.some(opt => opt.value === customModel)
+  ) {
     return filterModelOptionsByAllowlist(options)
   } else if (customModel === 'opusplan') {
     return filterModelOptionsByAllowlist([...options, getOpusPlanOption()])

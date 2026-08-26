@@ -98,6 +98,20 @@ export function resolveApiKeyModelRef(
   return { profileName: entry[0], profile: entry[1], model: ref.model }
 }
 
+/**
+ * True for an `apikey:<profile>/<model>` ref whose profile is not the active
+ * /apikey selection. Such refs linger in settings and in the startup model
+ * value after /apikey switches profiles, and must not be offered by /model.
+ */
+export function isInactiveApiKeyModelRef(
+  value: string | null | undefined,
+): boolean {
+  const ref = splitApiKeyModelRef(value)
+  if (!ref) return false
+  const active = getActiveApiKeyProfileName()
+  return !active || ref.profileName.toLowerCase() !== active.toLowerCase()
+}
+
 const APIKEY_MODEL_ROLES: ReadonlyArray<readonly [ApiKeyEnvKey, string]> = [
   ['ANTHROPIC_MODEL', 'default'],
   ['ANTHROPIC_DEFAULT_OPUS_MODEL', 'opus'],
