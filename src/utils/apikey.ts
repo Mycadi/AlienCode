@@ -291,3 +291,19 @@ export function getApiKeyEnvModelSetting(): string | undefined {
   if (!activeProfileName || splitApiKeyModelRef(envModel)) return envModel
   return formatApiKeyModelRef(activeProfileName, envModel)
 }
+
+/**
+ * True when the active /apikey profile declares this exact model id (directly or
+ * as its opus/sonnet/haiku/subagent default). Such a model must be served by the
+ * profile's credentials even when a logged-in Kiro/Codex account offers a model
+ * with the same id — aliases like `opus` resolve to a bare id with no
+ * `apikey:` prefix, so the prefix check alone is not enough.
+ */
+export function isActiveApiKeyProfileModel(model: string): boolean {
+  if (!activeProfileName) return false
+  const target = model.toLowerCase()
+  return APIKEY_MODEL_ROLES.some(([key]) => {
+    const value = process.env[key]
+    return !!value && value.toLowerCase() === target
+  })
+}
