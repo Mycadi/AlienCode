@@ -33,6 +33,11 @@ import { type ModelAlias, isModelAlias } from './aliases.js'
 import { capitalize } from '../stringUtils.js'
 import { DEFAULT_OPENCODE_ZEN_FREE_MODEL } from '../../services/api/opencode-zen-fetch-adapter.js'
 import { DEFAULT_KIRO_MODEL } from '../../services/api/kiro-fetch-adapter.js'
+import {
+  getApiKeyEnvModelSetting,
+  splitApiKeyModelRef,
+  stripApiKeyModelRef,
+} from '../apikey.js'
 
 export type ModelShortName = string
 export type ModelName = string
@@ -73,7 +78,8 @@ export function getUserSpecifiedModelSetting(): ModelSetting | undefined {
     specifiedModel = modelOverride
   } else {
     const settings = getSettings_DEPRECATED() || {}
-    specifiedModel = settings.model || process.env.ANTHROPIC_MODEL || undefined
+    specifiedModel =
+      settings.model || getApiKeyEnvModelSetting() || undefined
   }
 
   // Ignore the user-specified model if it's not in the availableModels allowlist.
@@ -364,6 +370,12 @@ export function renderDefaultModelSetting(
 ): string {
   if (setting === 'opusplan') {
     return 'Opus 4.8 in plan mode, else Sonnet 4.8'
+  }
+  // apikey:<profile>/<model> — mirror the /model picker label instead of
+  // echoing the raw ref.
+  const apiKeyRef = splitApiKeyModelRef(setting)
+  if (apiKeyRef) {
+    return `${apiKeyRef.model} (${apiKeyRef.profileName})`
   }
   return renderModelName(parseUserSpecifiedModel(setting))
 }
@@ -760,5 +772,5 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
 }
 
 export function normalizeModelStringForAPI(model: string): string {
-  return model.replace(/\[(1|2)m\]/gi, '')
+  return stripApiKeyModelRef(model).replace(/\[(1|2)m\]/gi, '')
 }

@@ -34,6 +34,11 @@ import {
 import { getGlobalConfig } from '../config.js'
 import { OPENCODE_ZEN_FREE_MODELS, isOpenCodeZenFreeModel } from '../../services/api/opencode-zen-fetch-adapter.js'
 import { KIRO_MODELS } from '../../services/api/kiro-fetch-adapter.js'
+import {
+  formatApiKeyModelRef,
+  getActiveApiKeyProfileName,
+  listApiKeyProfileModels,
+} from '../apikey.js'
 
 // @[MODEL LAUNCH]: Update all the available and default model option strings below.
 
@@ -280,39 +285,20 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     ]
   }
 
-  // Codex subscribers get OpenAI model options, plus any Anthropic env model
+  // Codex subscribers get OpenAI model options
   if (isCodexSubscriber()) {
-    const codexOptions = [
+    return [
       getDefaultOptionForUser(),
       getGpt55Option(),
       getGpt54Option(),
       getGpt53CodexOption(),
       getGpt54MiniOption(),
     ]
-    const anthropicEnvModel = getAnthropicEnvModelOption()
-    if (
-      anthropicEnvModel !== undefined &&
-      !codexOptions.some(option => option.value === anthropicEnvModel.value)
-    ) {
-      codexOptions.push(anthropicEnvModel)
-    }
-    return codexOptions
   }
 
   // Kiro subscribers get Kiro (Claude/GPT via CodeWhisperer) model options
   if (isKiroSubscriber()) {
-    const kiroOptions = [
-      getDefaultOptionForUser(),
-      ...getKiroModelOptions(),
-    ]
-    const anthropicEnvModel = getAnthropicEnvModelOption()
-    if (
-      anthropicEnvModel !== undefined &&
-      !kiroOptions.some(option => option.value === anthropicEnvModel.value)
-    ) {
-      kiroOptions.push(anthropicEnvModel)
-    }
-    return kiroOptions
+    return [getDefaultOptionForUser(), ...getKiroModelOptions()]
   }
 
   if (isClaudeAISubscriber()) {
@@ -444,22 +430,30 @@ function getKnownModelOption(model: string): ModelOption | null {
 export function getModelOptions(fastMode = false): ModelOption[] {
   const options = getModelOptionsBase(fastMode)
 
-  // Append apikey profile model mappings (haiku/sonnet/opus/subagent)
-  const apikeyMappings: Array<{ envKey: string; role: string }> = [
-    { envKey: 'ANTHROPIC_DEFAULT_HAIKU_MODEL', role: 'haiku' },
-    { envKey: 'ANTHROPIC_DEFAULT_SONNET_MODEL', role: 'sonnet' },
-    { envKey: 'ANTHROPIC_DEFAULT_OPUS_MODEL', role: 'opus' },
-    { envKey: 'CLAUDE_CODE_SUBAGENT_MODEL', role: 'subagent' },
-  ]
-  for (const { envKey, role } of apikeyMappings) {
-    const model = process.env[envKey]
-    if (model && !options.some(existing => existing.value === model)) {
-      options.push({
-        value: model,
-        label: model,
-        description: `${role} → ${model}`,
-      })
-    }
+  // Models declared in apikey.json, addressed as `apikey:<profile>/<model>` so
+  // they coexist with identically named models served by the logged-in account
+  // (Kiro also offers claude-opus-5 and gpt-5.6-sol).
+  for (const { profileName, model, role } of listApiKeyProfileModels()) {
+    const value = formatApiKeyModelRef(profileName, model)
+    if (options.some(existing => existing.value === value)) continue
+    options.push({
+      value,
+      label: `${model} (${profileName})`,
+      description: `apikey.json · ${profileName} · ${role}`,
+      descriptionForModel: `${model} via apikey profile ${profileName}`,
+    })
+  }
+
+  // ANTHROPIC_MODEL set outside apikey.json (shell env or settings.env);
+  // apikey profile models are already listed above.
+  const anthropicEnvModel = getActiveApiKeyProfileName()
+    ? undefined
+    : getAnthropicEnvModelOption()
+  if (
+    anthropicEnvModel !== undefined &&
+    !options.some(existing => existing.value === anthropicEnvModel.value)
+  ) {
+    options.push(anthropicEnvModel)
   }
 
   // Add the custom model from the ANTHROPIC_CUSTOM_MODEL_OPTION env var

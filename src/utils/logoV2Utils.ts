@@ -18,7 +18,7 @@ import { gt } from './semver.js'
 import { loadMessageLogs } from './sessionStorage.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isKiroModel } from '../services/api/kiro-fetch-adapter.js'
-import { getCurrentApiKeyProfile } from './apikey.js'
+import { getCurrentApiKeyProfile, splitApiKeyModelRef } from './apikey.js'
 
 // Layout constants
 const MAX_LEFT_WIDTH = 50
@@ -287,6 +287,12 @@ export function formatLogoModelSource(
   effortValue: EffortValue | undefined,
   billingType: string,
 ): { modelName: string; sourceName: string | undefined } {
+  // apikey:<profile>/<model> — show the bare model id, profile name as source
+  const apiKeyRef = splitApiKeyModelRef(model)
+  if (apiKeyRef) {
+    return { modelName: apiKeyRef.model, sourceName: apiKeyRef.profileName }
+  }
+
   if (model === 'minimax-m2.5-free') {
     return { modelName: 'MiniMax M2.5 Free', sourceName: undefined }
   }

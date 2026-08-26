@@ -7,6 +7,7 @@ import {
 } from 'src/utils/cch.js'
 import type { GoogleAuth } from 'google-auth-library'
 import type { ApiKeyProfile } from 'src/utils/apikey.js'
+import { resolveApiKeyModelRef } from 'src/utils/apikey.js'
 import {
   checkAndRefreshOAuthTokenIfNeeded,
   getAnthropicApiKey,
@@ -144,10 +145,16 @@ export async function getAnthropicClient({
     ...(clientApp ? { 'x-client-app': clientApp } : {}),
   }
 
-  const profileAuthToken = apiKeyProfile?.ANTHROPIC_AUTH_TOKEN
-  const profileBaseURL = apiKeyProfile?.ANTHROPIC_BASE_URL
-  const profileModel = apiKeyProfile?.ANTHROPIC_MODEL
-
+  // A model picked as `apikey:<profile>/<model>` in /model is pinned to that
+  // profile's credentials, even when a Kiro/Codex/Claude account is logged in.
+  // The prefixed id also can't match isKiroModel()/isCodexModel() below, so
+  // colliding ids (Kiro also serves claude-opus-5 and gpt-5.6-sol) stay apart.
+  const modelRef = resolveApiKeyModelRef(model)
+  const requestModel = modelRef?.model ?? model
+  const activeProfile = modelRef?.profile ?? apiKeyProfile
+  const profileAuthToken = activeProfile?.ANTHROPIC_AUTH_TOKEN
+  const profileBaseURL = activeProfile?.ANTHROPIC_BASE_URL
+  const profileModel = activeProfile?.ANTHROPIC_MODEL
   // Log API client configuration for HFI debugging
   logForDebugging(
     `[API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: ${!!process.env.ANTHROPIC_CUSTOM_HEADERS}, has Authorization header: ${!!customHeaders['Authorization']}`,
@@ -165,7 +172,9 @@ export async function getAnthropicClient({
   await checkAndRefreshOAuthTokenIfNeeded()
   logForDebugging('[API:auth] OAuth token check complete')
 
-  if (!isClaudeAISubscriber()) {
+  // An apikey model ref carries its own credentials, so its Authorization
+  // header must be set even while a claude.ai OAuth session exists.
+  if (!isClaudeAISubscriber() || modelRef) {
     await configureApiKeyHeaders(
       defaultHeaders,
       getIsNonInteractiveSession(),
@@ -337,7 +346,7 @@ export async function getAnthropicClient({
   const authToken = profileAuthToken ?? process.env.ANTHROPIC_AUTH_TOKEN
   const baseURL = profileBaseURL ?? process.env.ANTHROPIC_BASE_URL
   const envModel = profileModel ?? process.env.ANTHROPIC_MODEL
-  const adapterModel = resolveAdapterModel(model, envModel)
+  const adapterModel = resolveAdapterModel(requestModel, envModel)
 
   // ── Codex (OpenAI) provider via fetch adapter ─────────────────────
   // Must be checked before OpenAI-compatible so that Codex models use
@@ -406,11 +415,12 @@ export async function getAnthropicClient({
   }
 
   // Determine authentication method based on available tokens
+  const useClaudeAIOAuth = isClaudeAISubscriber() && !modelRef
   const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-    apiKey: isClaudeAISubscriber()
+    apiKey: useClaudeAIOAuth
       ? null
       : apiKey || profileAuthToken || getAnthropicApiKey(),
-    authToken: isClaudeAISubscriber()
+    authToken: useClaudeAIOAuth
       ? getClaudeAIOAuthTokens()?.accessToken
       : undefined,
     ...(profileBaseURL ? { baseURL: profileBaseURL } : {}),

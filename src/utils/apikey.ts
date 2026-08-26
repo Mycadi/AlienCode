@@ -22,7 +22,8 @@ type ApiKeyEnvKey = (typeof APIKEY_ENV_KEYS)[number]
 export type ApiKeyProfile = Partial<Record<ApiKeyEnvKey, string>>
 
 export type ApiKeyConfig = {
-  current?: string
+  // `null`/absent means no profile is active — credentials come from /login.
+  current?: string | null
   profiles: Record<string, ApiKeyProfile>
 }
 
@@ -37,6 +38,101 @@ export type CurrentApiKeyProfileResult =
 export function getApiKeyFilePath(): string {
   const settingsPath = getSettingsFilePathForSource('userSettings')
   return join(dirname(settingsPath ?? ''), 'apikey.json')
+}
+
+/**
+ * Models declared in apikey.json are addressed as `apikey:<profile>/<model>`
+ * so they stay distinct from identically named models served by a /login
+ * account (Kiro exposes `claude-opus-5` and `gpt-5.6-sol` too). The prefix is
+ * stripped again in normalizeModelStringForAPI() before the request is sent.
+ */
+export const APIKEY_MODEL_PREFIX = 'apikey:'
+
+export function formatApiKeyModelRef(
+  profileName: string,
+  model: string,
+): string {
+  return `${APIKEY_MODEL_PREFIX}${profileName}/${model}`
+}
+
+/**
+ * Pure text split of an `apikey:<profile>/<model>` ref — no config lookup, so
+ * it is safe to call from hot paths and from model display helpers.
+ */
+export function splitApiKeyModelRef(
+  value: string | null | undefined,
+): { profileName: string; model: string } | null {
+  if (!value?.startsWith(APIKEY_MODEL_PREFIX)) return null
+  const separator = value.indexOf('/', APIKEY_MODEL_PREFIX.length)
+  if (separator === -1) return null
+  const profileName = value.slice(APIKEY_MODEL_PREFIX.length, separator)
+  const model = value.slice(separator + 1)
+  if (!profileName || !model) return null
+  return { profileName, model }
+}
+
+export function stripApiKeyModelRef(model: string): string {
+  return splitApiKeyModelRef(model)?.model ?? model
+}
+
+/**
+ * Resolve an `apikey:<profile>/<model>` ref against apikey.json. Profile names
+ * are matched case-insensitively because model settings are lowercased by
+ * parseUserSpecifiedModel().
+ */
+export function resolveApiKeyModelRef(
+  value: string | null | undefined,
+): { profileName: string; profile: ApiKeyProfile; model: string } | null {
+  const ref = splitApiKeyModelRef(value)
+  if (!ref) return null
+
+  const result = readApiKeyConfig()
+  if (!result.ok) return null
+
+  const target = ref.profileName.toLowerCase()
+  const entry = Object.entries(result.config.profiles).find(
+    ([name]) => name.toLowerCase() === target,
+  )
+  if (!entry) return null
+
+  return { profileName: entry[0], profile: entry[1], model: ref.model }
+}
+
+const APIKEY_MODEL_ROLES: ReadonlyArray<readonly [ApiKeyEnvKey, string]> = [
+  ['ANTHROPIC_MODEL', 'default'],
+  ['ANTHROPIC_DEFAULT_OPUS_MODEL', 'opus'],
+  ['ANTHROPIC_DEFAULT_SONNET_MODEL', 'sonnet'],
+  ['ANTHROPIC_DEFAULT_HAIKU_MODEL', 'haiku'],
+  ['CLAUDE_CODE_SUBAGENT_MODEL', 'subagent'],
+]
+
+export type ApiKeyProfileModel = {
+  profileName: string
+  model: string
+  role: string
+}
+
+/**
+ * Every model declared across all apikey.json profiles, so /model can list
+ * them alongside the models of the currently logged-in account.
+ */
+export function listApiKeyProfileModels(): ApiKeyProfileModel[] {
+  const result = readApiKeyConfig()
+  if (!result.ok) return []
+
+  const models: ApiKeyProfileModel[] = []
+  const seen = new Set<string>()
+  for (const [profileName, profile] of Object.entries(result.config.profiles)) {
+    for (const [key, role] of APIKEY_MODEL_ROLES) {
+      const model = profile[key]
+      if (!model) continue
+      const dedupeKey = `${profileName}/${model}`
+      if (seen.has(dedupeKey)) continue
+      seen.add(dedupeKey)
+      models.push({ profileName, model, role })
+    }
+  }
+  return models
 }
 
 function isStringRecord(value: unknown): value is Record<string, unknown> {
@@ -96,10 +192,9 @@ export function getCurrentApiKeyProfile(): CurrentApiKeyProfileResult {
   if (!result.ok) return result
 
   const { config, path } = result
-  const names = Object.keys(config.profiles)
-  const name = config.current ?? names[0]
+  const name = config.current
   if (!name) {
-    return { ok: false, path, error: 'No apikey profiles found' }
+    return { ok: false, path, error: 'No apikey profile is selected' }
   }
 
   return getApiKeyProfileFromConfig(name, config, path)
@@ -125,15 +220,17 @@ function getApiKeyProfileFromConfig(
   return { ok: true, name, profile, config, path }
 }
 
-export function setCurrentApiKeyProfile(name: string): CurrentApiKeyProfileResult {
+export function setCurrentApiKeyProfile(
+  name: string | null,
+): CurrentApiKeyProfileResult {
   const result = readApiKeyConfig()
   if (!result.ok) return result
 
-  if (!result.config.profiles[name]) {
+  if (name !== null && !result.config.profiles[name]) {
     return { ok: false, path: result.path, error: `Api key profile '${name}' not found` }
   }
 
-  const config = { ...result.config, current: name }
+  const config: ApiKeyConfig = { ...result.config, current: name }
   writeFileSyncAndFlush_DEPRECATED(
     result.path,
     `${jsonStringify(config, null, 2)}\n`,
@@ -142,14 +239,25 @@ export function setCurrentApiKeyProfile(name: string): CurrentApiKeyProfileResul
 
   return {
     ok: true,
-    name,
-    profile: config.profiles[name],
+    name: name ?? '',
+    profile: name === null ? {} : config.profiles[name],
     config,
     path: result.path,
   }
 }
 
-export function applyApiKeyProfileToEnv(profile: ApiKeyProfile): void {
+// Name of the profile whose values are currently applied to process.env, or
+// null when credentials come from /login instead.
+let activeProfileName: string | null = null
+
+export function getActiveApiKeyProfileName(): string | null {
+  return activeProfileName
+}
+
+export function applyApiKeyProfileToEnv(
+  profile: ApiKeyProfile,
+  name: string | null,
+): void {
   // Clear all apikey-related env vars first, then set new profile values.
   // This prevents stale values from a previous profile leaking into the
   // model picker and other subsystems when the new profile omits a key.
@@ -162,11 +270,24 @@ export function applyApiKeyProfileToEnv(profile: ApiKeyProfile): void {
       process.env[key] = value
     }
   }
+  activeProfileName = name
 }
 
 export function applyCurrentApiKeyProfileToEnv(): void {
   const result = getCurrentApiKeyProfile()
   if (result.ok) {
-    applyApiKeyProfileToEnv(result.profile)
+    applyApiKeyProfileToEnv(result.profile, result.name)
   }
+}
+
+/**
+ * The env-level model default (ANTHROPIC_MODEL), expressed as an
+ * `apikey:<profile>/<model>` ref when it came from an active /apikey profile so
+ * a concurrent Kiro/Codex login cannot hijack a colliding model id.
+ */
+export function getApiKeyEnvModelSetting(): string | undefined {
+  const envModel = process.env.ANTHROPIC_MODEL
+  if (!envModel) return undefined
+  if (!activeProfileName || splitApiKeyModelRef(envModel)) return envModel
+  return formatApiKeyModelRef(activeProfileName, envModel)
 }

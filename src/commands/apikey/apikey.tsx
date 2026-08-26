@@ -5,10 +5,20 @@ import { useSetAppState } from '../../state/AppState.js'
 import type { LocalJSXCommandCall, LocalJSXCommandOnDone } from '../../types/command.js'
 import {
   applyApiKeyProfileToEnv,
+  formatApiKeyModelRef,
   readApiKeyConfig,
   setCurrentApiKeyProfile,
   type ApiKeyProfile,
 } from '../../utils/apikey.js'
+
+// Sentinel for the "no profile" entry. Not a valid JSON object key collision
+// risk since profile names come from apikey.json's `profiles` map.
+const NONE_VALUE = '\u0000none'
+
+function isNoneArg(value: string): boolean {
+  const normalized = value.toLowerCase()
+  return normalized === 'none' || normalized === 'off' || normalized === 'null'
+}
 
 function describeProfile(profile: ApiKeyProfile): string {
   const models = [
@@ -28,25 +38,35 @@ function formatSuccess(name: string, profile: ApiKeyProfile): string {
     : `Set API key profile to ${chalk.bold(name)}`
 }
 
-function useApplyProfile(onDone: LocalJSXCommandOnDone): (name: string) => void {
+function useApplyProfile(
+  onDone: LocalJSXCommandOnDone,
+): (name: string | null) => void {
   const setAppState = useSetAppState()
 
   return React.useCallback(
-    (name: string) => {
+    (name: string | null) => {
       const result = setCurrentApiKeyProfile(name)
       if (!result.ok) {
         onDone(result.error, { display: 'system' })
         return
       }
 
-      applyApiKeyProfileToEnv(result.profile)
+      applyApiKeyProfileToEnv(result.profile, name)
+      const profileModel = result.profile.ANTHROPIC_MODEL
       setAppState(prev => ({
         ...prev,
-        mainLoopModel: result.profile.ANTHROPIC_MODEL ?? null,
+        // Pin the profile's model as an apikey ref so a logged-in Kiro/Codex
+        // account can't take over a colliding model id.
+        mainLoopModel:
+          name && profileModel ? formatApiKeyModelRef(name, profileModel) : null,
         mainLoopModelForSession: null,
       }))
 
-      onDone(formatSuccess(result.name, result.profile))
+      onDone(
+        name === null
+          ? 'Cleared API key profile (using /login account)'
+          : formatSuccess(result.name, result.profile),
+      )
     },
     [onDone, setAppState],
   )
@@ -89,13 +109,20 @@ function ApiKeyPicker({ onDone }: { onDone: LocalJSXCommandOnDone }): React.Reac
   return (
     <Select
       visibleOptionCount={10}
-      options={names.map(name => ({
-        label: name,
-        value: name,
-        description: describeProfile(result.config.profiles[name]),
-      }))}
-      defaultValue={result.config.current}
-      onChange={applyProfile}
+      options={[
+        {
+          label: 'None',
+          value: NONE_VALUE,
+          description: 'Use the account from /login',
+        },
+        ...names.map(name => ({
+          label: name,
+          value: name,
+          description: describeProfile(result.config.profiles[name]),
+        })),
+      ]}
+      defaultValue={result.config.current ?? NONE_VALUE}
+      onChange={value => applyProfile(value === NONE_VALUE ? null : value)}
       onCancel={() => onDone('Kept current API key profile', { display: 'system' })}
     />
   )
@@ -110,7 +137,8 @@ function SetApiKeyAndClose({
 }): React.ReactNode {
   const applyProfile = useApplyProfile(onDone)
   React.useEffect(() => {
-    applyProfile(args.trim())
+    const name = args.trim()
+    applyProfile(isNoneArg(name) ? null : name)
   }, [applyProfile, args])
   return null
 }

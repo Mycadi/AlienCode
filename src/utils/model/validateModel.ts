@@ -41,6 +41,14 @@ export async function validateModel(
     return { valid: true }
   }
 
+  // apikey:<profile>/<model> refs are user-declared in apikey.json — trust them
+  // instead of spending a request on the profile's endpoint.
+  const { resolveApiKeyModelRef } = await import('../apikey.js')
+  if (resolveApiKeyModelRef(normalizedModel)) {
+    validModelCache.set(normalizedModel, true)
+    return { valid: true }
+  }
+
   // Check if it's a known Codex/OpenAI model (skip Anthropic API validation)
   const { isCodexSubscriber } = await import('../auth.js')
   const { isCodexModel } = await import('../../services/api/codex-fetch-adapter.js')
