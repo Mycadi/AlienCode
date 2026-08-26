@@ -113,24 +113,30 @@ export type ApiKeyProfileModel = {
 }
 
 /**
- * Every model declared across all apikey.json profiles, so /model can list
- * them alongside the models of the currently logged-in account.
+ * Models declared by the currently selected apikey.json profile only, so /model
+ * shows exactly what the active /apikey selection can serve. Returns [] when no
+ * profile is selected (/apikey None → credentials come from /login).
  */
 export function listApiKeyProfileModels(): ApiKeyProfileModel[] {
   const result = readApiKeyConfig()
   if (!result.ok) return []
 
+  // The runtime-applied profile wins; fall back to the file's `current` for
+  // callers that run before applyCurrentApiKeyProfileToEnv(). Both are empty
+  // once None is selected.
+  const profileName = getActiveApiKeyProfileName() ?? result.config.current
+  if (!profileName) return []
+  const profile = result.config.profiles[profileName]
+  if (!profile) return []
+
   const models: ApiKeyProfileModel[] = []
   const seen = new Set<string>()
-  for (const [profileName, profile] of Object.entries(result.config.profiles)) {
-    for (const [key, role] of APIKEY_MODEL_ROLES) {
-      const model = profile[key]
-      if (!model) continue
-      const dedupeKey = `${profileName}/${model}`
-      if (seen.has(dedupeKey)) continue
-      seen.add(dedupeKey)
-      models.push({ profileName, model, role })
-    }
+  for (const [key, role] of APIKEY_MODEL_ROLES) {
+    const model = profile[key]
+    if (!model) continue
+    if (seen.has(model)) continue
+    seen.add(model)
+    models.push({ profileName, model, role })
   }
   return models
 }
