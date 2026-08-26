@@ -31,7 +31,6 @@ import { LIGHTNING_BOLT } from '../../constants/figures.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import { type ModelAlias, isModelAlias } from './aliases.js'
 import { capitalize } from '../stringUtils.js'
-import { DEFAULT_OPENCODE_ZEN_FREE_MODEL } from '../../services/api/opencode-zen-fetch-adapter.js'
 import { DEFAULT_KIRO_MODEL } from '../../services/api/kiro-fetch-adapter.js'
 import {
   getApiKeyEnvModelSetting,
@@ -188,25 +187,7 @@ export function getRuntimeMainLoopModel(params: {
  *
  * @returns The default model setting to use
  */
-function hasAnthropicModelEnvConfig(): boolean {
-  return !!(
-    process.env.ANTHROPIC_BASE_URL &&
-    process.env.ANTHROPIC_AUTH_TOKEN &&
-    process.env.ANTHROPIC_MODEL
-  )
-}
-
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
-  if (
-    process.env.USER_TYPE !== 'ant' &&
-    !isCodexSubscriber() &&
-    !isKiroSubscriber() &&
-    !isClaudeAISubscriber() &&
-    !hasAnthropicModelEnvConfig()
-  ) {
-    return DEFAULT_OPENCODE_ZEN_FREE_MODEL
-  }
-
   if (isCodexSubscriber()) {
     return getModelStrings().gpt53codex
   }
@@ -423,15 +404,6 @@ export function renderModelSetting(setting: ModelName | ModelAlias): string {
  * if the model is not recognized as a public model.
  */
 export function getPublicModelDisplayName(model: ModelName): string | null {
-  switch (model) {
-    case 'deepseek-v4-flash-free':
-      return 'DeepSeek V4 Flash Free'
-    case 'minimax-m2.5-free':
-      return 'MiniMax M2.5 Free'
-    case 'ring-2.6-1t-free':
-      return 'Ring 2.6 1T Free'
-  }
-
   if (model.includes('gpt-') || model.includes('codex')) {
     if (model === 'gpt-5.2-codex') return 'Codex 5.2'
     if (model === 'gpt-5.1-codex') return 'Codex 5.1'
@@ -699,15 +671,6 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   const lowerModelId = modelId.toLowerCase()
   const has1m = lowerModelId.includes('[1m]')
   const canonical = getCanonicalName(modelId)
-
-  switch (lowerModelId) {
-    case 'deepseek-v4-flash-free':
-      return 'DeepSeek V4 Flash Free'
-    case 'minimax-m2.5-free':
-      return 'MiniMax M2.5 Free'
-    case 'ring-2.6-1t-free':
-      return 'Ring 2.6 1T Free'
-  }
 
   if (canonical.includes('claude-opus-4-8')) {
     return has1m ? 'Opus 4.8 (with 1M context)' : 'Opus 4.8'

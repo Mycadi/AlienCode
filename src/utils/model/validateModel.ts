@@ -65,15 +65,6 @@ export async function validateModel(
     return { valid: true }
   }
 
-  // Check if it's a known OpenCode Zen free model (handled by fetch adapter)
-  const { isOpenCodeZenFreeModel } = await import(
-    '../../services/api/opencode-zen-fetch-adapter.js'
-  )
-  if (isOpenCodeZenFreeModel(normalizedModel)) {
-    validModelCache.set(normalizedModel, true)
-    return { valid: true }
-  }
-
   // Check if it matches ANTHROPIC_CUSTOM_MODEL_OPTION (pre-validated by the user)
   if (normalizedModel === process.env.ANTHROPIC_CUSTOM_MODEL_OPTION) {
     return { valid: true }

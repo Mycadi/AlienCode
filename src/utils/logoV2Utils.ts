@@ -293,10 +293,6 @@ export function formatLogoModelSource(
     return { modelName: apiKeyRef.model, sourceName: apiKeyRef.profileName }
   }
 
-  if (model === 'minimax-m2.5-free') {
-    return { modelName: 'MiniMax M2.5 Free', sourceName: undefined }
-  }
-
   if (isCodexSubscriber()) {
     if (model === 'gpt-5.5' || model === 'gpt-5.4' || model === 'gpt-5.3-codex') {
       const effort = getDisplayedEffortLevel(model, effortValue)

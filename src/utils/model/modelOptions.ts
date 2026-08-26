@@ -32,7 +32,6 @@ import {
   type ModelSetting,
 } from './model.js'
 import { getGlobalConfig } from '../config.js'
-import { OPENCODE_ZEN_FREE_MODELS, isOpenCodeZenFreeModel } from '../../services/api/opencode-zen-fetch-adapter.js'
 import { KIRO_MODELS } from '../../services/api/kiro-fetch-adapter.js'
 import {
   formatApiKeyModelRef,
@@ -134,15 +133,6 @@ function getHaiku45Option(): ModelOption {
     descriptionForModel:
       'Haiku 4.5 - fastest for quick answers. Lower cost but less capable than Sonnet 4.6.',
   }
-}
-
-function getOpenCodeZenFreeModelOptions(): ModelOption[] {
-  return OPENCODE_ZEN_FREE_MODELS.map(model => ({
-    value: model.id,
-    label: model.label,
-    description: `${model.label} · OpenCode Zen free model`,
-    descriptionForModel: `${model.label} - OpenCode Zen free model`,
-  }))
 }
 
 // OpenAI Codex model options
@@ -478,13 +468,6 @@ export function getModelOptions(fastMode = false): ModelOption[] {
     }
   }
 
-  // Append free models (will be sorted to end by filterModelOptionsByAllowlist)
-  for (const opt of getOpenCodeZenFreeModelOptions()) {
-    if (!options.some(existing => existing.value === opt.value)) {
-      options.push(opt)
-    }
-  }
-
   // Add custom model from either the current model value or the initial one
   // if it is not already in the options.
   let customModel: ModelSetting = null
@@ -529,20 +512,13 @@ export function getModelOptions(fastMode = false): ModelOption[] {
 /**
  * Filter model options by the availableModels allowlist.
  * Always preserves the "Default" option (value: null).
- * Free models are always sorted to the end of the list.
  */
 function filterModelOptionsByAllowlist(options: ModelOption[]): ModelOption[] {
   const settings = getSettings_DEPRECATED() || {}
-  let filtered = settings.availableModels
+  return settings.availableModels
     ? options.filter(
         opt =>
           opt.value === null || (opt.value !== null && isModelAllowed(opt.value)),
       )
     : options
-
-  // Sort free models to the end
-  const nonFree = filtered.filter(opt => opt.value !== null && !isOpenCodeZenFreeModel(opt.value))
-  const free = filtered.filter(opt => opt.value !== null && isOpenCodeZenFreeModel(opt.value))
-  const defaultOpt = filtered.filter(opt => opt.value === null)
-  return [...defaultOpt, ...nonFree, ...free]
 }

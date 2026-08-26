@@ -48,10 +48,6 @@ import {
   createOpenAICompatibleFetch,
   isOpenAICompatibleChatCompletionsUrl,
 } from './openai-compatible-fetch-adapter.js'
-import {
-  createOpenCodeZenFetch,
-  isOpenCodeZenFreeModel,
-} from './opencode-zen-fetch-adapter.js'
 
 /**
  * Environment variables for different client types:
@@ -387,21 +383,6 @@ export async function getAnthropicClient({
       }
       return new Anthropic(clientConfig)
     }
-  }
-
-  // ── OpenCode Zen free models via public fetch adapter ────────────────
-  // Must be checked before OpenAI-compatible so that free models use
-  // their own public auth instead of an apikey profile's credentials.
-  if (model && isOpenCodeZenFreeModel(model)) {
-    const openCodeZenFetch = createOpenCodeZenFetch()
-    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
-      apiKey: 'opencode-zen-public-placeholder', // SDK requires a key; adapter sends public auth
-      baseURL: 'https://api.anthropic.com', // ignore user ANTHROPIC_BASE_URL for OpenCode free models
-      ...ARGS,
-      fetch: openCodeZenFetch as unknown as typeof globalThis.fetch,
-      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
-    }
-    return new Anthropic(clientConfig)
   }
 
   // ── OpenAI-compatible chat/completions via apikey.json ──────────────
