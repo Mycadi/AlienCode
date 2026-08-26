@@ -1,6 +1,8 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { getInitialMainLoopModel } from '../../bootstrap/state.js'
 import {
+  getAuthTokenSource,
+  hasAnthropicApiKeyAuth,
   isClaudeAISubscriber,
   isCodexSubscriber,
   isKiroSubscriber,
@@ -328,9 +330,26 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return standardOptions
   }
 
+  // No account, no API key, no apikey.json profile: there is nothing the
+  // default option could resolve to, so offer no models at all.
+  if (!hasUsableCredential()) {
+    return []
+  }
+
   // Unauthenticated users: keep only the base default option here.
   // getModelOptions() will still append free/custom/current model options below.
   return [getDefaultOptionForUser(fastMode)]
+}
+
+/**
+ * Whether any credential is available for the default model to run on:
+ * a 3P/OAuth provider, an apikey.json profile, an API key, or an auth token.
+ */
+function hasUsableCredential(): boolean {
+  if (getAPIProvider() !== 'firstParty') return true
+  if (getActiveApiKeyProfileName()) return true
+  if (hasAnthropicApiKeyAuth()) return true
+  return getAuthTokenSource().hasToken
 }
 
 // @[MODEL LAUNCH]: Add the new model ID to the appropriate family pattern below
