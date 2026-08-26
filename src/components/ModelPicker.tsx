@@ -7,6 +7,7 @@ import { type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS, logEve
 import { isCodexModel } from 'src/services/api/codex-fetch-adapter.js';
 import { getCodexLimitsDisplayText, refreshCodexLimitsFromAnalytics } from 'src/services/codexLimits.js';
 import { FAST_MODE_MODEL_DISPLAY, isFastModeAvailable, isFastModeCooldown, isFastModeEnabled } from 'src/utils/fastMode.js';
+import { useRegisterOverlay } from '../context/overlayContext.js';
 import { Box, Text } from '../ink.js';
 import { useKeybindings } from '../keybindings/useKeybinding.js';
 import { useAppState, useSetAppState } from '../state/AppState.js';
@@ -138,6 +139,18 @@ export function ModelPicker(t0) {
   const initialFocusValue = t6;
   const visibleCount = Math.min(10, selectOptions.length);
   const hiddenCount = Math.max(0, selectOptions.length - visibleCount);
+  // With no options we never render <Select>, so nothing registers the
+  // 'select:cancel' keybinding (or the 'select' overlay that keeps
+  // CancelRequestHandler from swallowing Escape) — the picker would be stuck.
+  const hasNoOptions = selectOptions.length === 0;
+  useRegisterOverlay("select", hasNoOptions);
+  const emptyCancelHandlers = useMemo(() => ({
+    "select:cancel": () => onCancel?.()
+  }), [onCancel]);
+  useKeybindings(emptyCancelHandlers, {
+    context: "Select",
+    isActive: hasNoOptions
+  });
   let t7;
   if ($[17] !== focusedValue || $[18] !== selectOptions) {
     t7 = selectOptions.find(opt_1 => opt_1.value === focusedValue)?.label;
@@ -320,7 +333,7 @@ export function ModelPicker(t0) {
   const t20 = onCancel ?? _temp4;
   let t21;
   if ($[49] !== handleFocus || $[50] !== handleSelect || $[51] !== initialFocusValue || $[52] !== initialValue || $[53] !== selectOptions || $[54] !== t20 || $[55] !== visibleCount) {
-    t21 = selectOptions.length === 0 ? <Box flexDirection="column"><Text color="subtle">No available model. Please log in or configure an API key to use it.</Text></Box> : <Box flexDirection="column"><Select defaultValue={initialValue} defaultFocusValue={initialFocusValue} options={selectOptions} onChange={handleSelect} onFocus={handleFocus} onCancel={t20} visibleOptionCount={visibleCount} /></Box>;
+    t21 = hasNoOptions ? <Box flexDirection="column"><Text color="subtle">No available model. Run /login or /apikey to configure one.</Text></Box> : <Box flexDirection="column"><Select defaultValue={initialValue} defaultFocusValue={initialFocusValue} options={selectOptions} onChange={handleSelect} onFocus={handleFocus} onCancel={t20} visibleOptionCount={visibleCount} /></Box>;
     $[49] = handleFocus;
     $[50] = handleSelect;
     $[51] = initialFocusValue;
@@ -382,10 +395,11 @@ export function ModelPicker(t0) {
     t28 = $[77];
   }
   let t29;
-  if ($[78] !== exitState || $[79] !== isStandaloneCommand) {
-    t29 = isStandaloneCommand && <Text dimColor={true} italic={true}>{exitState.pending ? <>Press {exitState.keyName} again to exit</> : <Byline><KeyboardShortcutHint shortcut="Enter" action="confirm" /><ConfigurableShortcutHint action="select:cancel" context="Select" fallback="Esc" description="exit" /></Byline>}</Text>;
+  if ($[78] !== exitState || $[79] !== isStandaloneCommand || $[84] !== hasNoOptions) {
+    t29 = isStandaloneCommand && <Text dimColor={true} italic={true}>{exitState.pending ? <>Press {exitState.keyName} again to exit</> : <Byline>{hasNoOptions ? null : <KeyboardShortcutHint shortcut="Enter" action="confirm" />}<ConfigurableShortcutHint action="select:cancel" context="Select" fallback="Esc" description="exit" /></Byline>}</Text>;
     $[78] = exitState;
     $[79] = isStandaloneCommand;
+    $[84] = hasNoOptions;
     $[80] = t29;
   } else {
     t29 = $[80];

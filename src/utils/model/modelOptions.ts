@@ -21,16 +21,13 @@ import { getAPIProvider } from './providers.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import {
   getCanonicalName,
-  getClaudeAiUserDefaultModelDescription,
   getDefaultSonnetModel,
   getDefaultOpusModel,
   getDefaultHaikuModel,
-  getDefaultMainLoopModelSetting,
   getMarketingNameForModel,
   getUserSpecifiedModelSetting,
   isOpus1mMergeEnabled,
   getOpus48PricingSuffix,
-  renderDefaultModelSetting,
   type ModelSetting,
 } from './model.js'
 import { getGlobalConfig } from '../config.js'
@@ -49,37 +46,6 @@ export type ModelOption = {
   label: string
   description: string
   descriptionForModel?: string
-}
-
-export function getDefaultOptionForUser(fastMode = false): ModelOption {
-  if (process.env.USER_TYPE === 'ant') {
-    const currentModel = renderDefaultModelSetting(
-      getDefaultMainLoopModelSetting(),
-    )
-    return {
-      value: null,
-      label: 'Default (recommended)',
-      description: `Use the default model for Ants (currently ${currentModel})`,
-      descriptionForModel: `Default model (currently ${currentModel})`,
-    }
-  }
-
-  // Subscribers
-  if (isClaudeAISubscriber()) {
-    return {
-      value: null,
-      label: 'Default (recommended)',
-      description: getClaudeAiUserDefaultModelDescription(fastMode),
-    }
-  }
-
-  // PAYG
-  const is3P = getAPIProvider() !== 'firstParty'
-  return {
-    value: null,
-    label: 'Default (recommended)',
-    description: `Use the default model (currently ${renderDefaultModelSetting(getDefaultMainLoopModelSetting())})${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
-  }
 }
 
 // @[MODEL LAUNCH]: Update or add model option functions (getSonnetXXOption, getOpusXXOption, etc.)
@@ -269,7 +235,6 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     }))
 
     return [
-      getDefaultOptionForUser(),
       ...antModelOptions,
       getMergedOpus1MOption(fastMode),
       getSonnet46Option(),
@@ -281,7 +246,6 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   // Codex subscribers get OpenAI model options
   if (isCodexSubscriber()) {
     return [
-      getDefaultOptionForUser(),
       getGpt55Option(),
       getGpt54Option(),
       getGpt53CodexOption(),
@@ -291,13 +255,15 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
 
   // Kiro subscribers get Kiro (Claude/GPT via CodeWhisperer) model options
   if (isKiroSubscriber()) {
-    return [getDefaultOptionForUser(), ...getKiroModelOptions()]
+    return getKiroModelOptions()
   }
 
   if (isClaudeAISubscriber()) {
     if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
-      // Max and Team Premium users: Opus is default, show Sonnet as alternative
-      const premiumOptions = [getDefaultOptionForUser(fastMode)]
+      // Max and Team Premium users: Opus first, Sonnet as alternative
+      const premiumOptions = isOpus1mMergeEnabled()
+        ? [getMergedOpus1MOption(fastMode)]
+        : [getMaxOpusOption(fastMode)]
       if (!isOpus1mMergeEnabled() && checkOpus1mAccess()) {
         premiumOptions.push(getMaxOpus46_1MOption(fastMode))
       }
@@ -311,8 +277,8 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       return premiumOptions
     }
 
-    // Pro/Team Standard/Enterprise users: Sonnet is default, show Opus as alternative
-    const standardOptions = [getDefaultOptionForUser(fastMode)]
+    // Pro/Team Standard/Enterprise users: Sonnet first, Opus as alternative
+    const standardOptions = [MaxSonnet46Option]
     if (checkSonnet1mAccess()) {
       standardOptions.push(getMaxSonnet46_1MOption())
     }
@@ -330,15 +296,15 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return standardOptions
   }
 
-  // No account, no API key, no apikey.json profile: there is nothing the
-  // default option could resolve to, so offer no models at all.
+  // No account, no API key, no apikey.json profile: nothing to run on, so
+  // offer no models at all.
   if (!hasUsableCredential()) {
     return []
   }
 
-  // Unauthenticated users: keep only the base default option here.
-  // getModelOptions() will still append free/custom/current model options below.
-  return [getDefaultOptionForUser(fastMode)]
+  // API key / 3P provider users: list the concrete models directly.
+  // getModelOptions() will still append apikey/env/custom model options below.
+  return [getSonnet46Option(), getOpus46Option(fastMode), getHaiku45Option()]
 }
 
 /**
