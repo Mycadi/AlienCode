@@ -304,10 +304,10 @@ export function ModelPicker(t0) {
   } else {
     t15 = $[41];
   }
-  const t16 = headerText ?? "Switch between Claude models. Applies to this session and future Claude Code sessions. For other/previous model names, specify with --model.";
+  const t16 = headerText ?? "";
   let t17;
   if ($[42] !== t16) {
-    t17 = <Text dimColor={true}>{t16}</Text>;
+    t17 = t16 ? <Text dimColor={true}>{t16}</Text> : null;
     $[42] = t16;
     $[43] = t17;
   } else {

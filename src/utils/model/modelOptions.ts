@@ -302,6 +302,13 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return []
   }
 
+  // Using an apikey.json profile: the profile's own models are appended by
+  // getModelOptions() below. Don't leak the default Sonnet/Opus/Haiku trio
+  // into the list — they aren't served by this profile.
+  if (getActiveApiKeyProfileName()) {
+    return []
+  }
+
   // API key / 3P provider users: list the concrete models directly.
   // getModelOptions() will still append apikey/env/custom model options below.
   return [getSonnet46Option(), getOpus46Option(fastMode), getHaiku45Option()]
