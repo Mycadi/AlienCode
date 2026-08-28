@@ -394,6 +394,7 @@ export async function getAnthropicClient({
     const codexFetch = createCodexFetch({
       accessToken: authToken,
       endpoint: codexEndpoint,
+      passthroughModel: true,
     })
     const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
       apiKey: 'codex-apikey-placeholder', // SDK requires a key but the fetch adapter handles auth

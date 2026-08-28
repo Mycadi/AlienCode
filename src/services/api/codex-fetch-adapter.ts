@@ -222,7 +222,10 @@ function translateMessages(
  * @param anthropicBody - The Anthropic request body to translate
  * @returns Object containing the translated Codex body and model
  */
-function translateToCodexBody(anthropicBody: Record<string, unknown>): {
+function translateToCodexBody(
+  anthropicBody: Record<string, unknown>,
+  passthroughModel = false,
+): {
   codexBody: Record<string, unknown>
   codexModel: string
 } {
@@ -234,7 +237,12 @@ function translateToCodexBody(anthropicBody: Record<string, unknown>): {
   const claudeModel = anthropicBody.model as string
   const anthropicTools = (anthropicBody.tools || []) as AnthropicTool[]
 
-  const codexModel = mapClaudeModelToCodex(claudeModel)
+  // OAuth mode maps Claude model names to Codex ones; apikey mode passes
+  // the user-declared model name through so third-party providers serve
+  // whatever channel they actually have.
+  const codexModel = passthroughModel
+    ? claudeModel
+    : mapClaudeModelToCodex(claudeModel)
 
   // Build system instructions
   let instructions = ''
@@ -747,6 +755,25 @@ async function translateCodexStreamToAnthropic(
 // ── Main fetch interceptor ──────────────────────────────────────────
 
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex/responses'
+const RESPONSES_SUFFIX = '/responses'
+
+/**
+ * Resolves a Responses API endpoint. If the URL already ends with
+ * `/responses` it is used as-is; otherwise `/responses` is appended so a
+ * bare `/v1` base URL (the common convention for OpenAI-compatible
+ * providers) does not 30x-loop into `/v1/`.
+ */
+function resolveResponsesUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (parsed.pathname.endsWith(RESPONSES_SUFFIX)) return url
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '') + RESPONSES_SUFFIX
+    return parsed.toString()
+  } catch {
+    if (url.includes(RESPONSES_SUFFIX)) return url
+    return `${url.replace(/\/+$/, '')}${RESPONSES_SUFFIX}`
+  }
+}
 
 export type CreateCodexFetchOptions = {
   accessToken: string
@@ -756,6 +783,12 @@ export type CreateCodexFetchOptions = {
    * URL when using a plain API key from apikey.json.
    */
   endpoint?: string
+  /**
+   * Pass the request's model name through verbatim instead of mapping
+   * Claude names to Codex ones. Used by apikey.json profiles, where the
+   * user-declared model must reach third-party providers unchanged.
+   */
+  passthroughModel?: boolean
 }
 
 /**
@@ -766,7 +799,8 @@ export type CreateCodexFetchOptions = {
 export function createCodexFetch(
   options: CreateCodexFetchOptions,
 ): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
-  const { accessToken, endpoint = CODEX_BASE_URL } = options
+  const { accessToken, endpoint = CODEX_BASE_URL, passthroughModel = false } = options
+  const responsesUrl = resolveResponsesUrl(endpoint)
   const accountId = extractAccountId(accessToken)
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -796,7 +830,7 @@ export function createCodexFetch(
     const currentToken = tokens?.accessToken || accessToken
 
     // Translate to Codex format
-    const { codexBody, codexModel } = translateToCodexBody(anthropicBody)
+    const { codexBody, codexModel } = translateToCodexBody(anthropicBody, passthroughModel)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -812,7 +846,7 @@ export function createCodexFetch(
     }
 
     // Call Codex API
-    const codexResponse = await globalThis.fetch(endpoint, {
+    const codexResponse = await globalThis.fetch(responsesUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(codexBody),
