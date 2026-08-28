@@ -357,7 +357,7 @@ export async function getAnthropicClient({
   if (isCodexSubscriber() && model && isCodexModel(model) && !pinnedToProfile) {
     const codexTokens = getCodexOAuthTokens()
     if (codexTokens?.accessToken) {
-      const codexFetch = createCodexFetch(codexTokens.accessToken)
+      const codexFetch = createCodexFetch({ accessToken: codexTokens.accessToken })
       const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
         apiKey: 'codex-placeholder', // SDK requires a key but the fetch adapter handles auth
         ...ARGS,
@@ -383,6 +383,25 @@ export async function getAnthropicClient({
       }
       return new Anthropic(clientConfig)
     }
+  }
+
+  // ── Codex (OpenAI Responses) via apikey.json ANTHROPIC_API_KIND=codex ──
+  // A profile that sets ANTHROPIC_API_KIND=codex routes through the Codex
+  // fetch adapter against the profile's ANTHROPIC_BASE_URL (a /v1/responses
+  // endpoint), using the profile's ANTHROPIC_AUTH_TOKEN as a Bearer key.
+  if (activeProfile?.ANTHROPIC_API_KIND === 'codex' && authToken) {
+    const codexEndpoint = baseURL || 'https://api.openai.com/v1/responses'
+    const codexFetch = createCodexFetch({
+      accessToken: authToken,
+      endpoint: codexEndpoint,
+    })
+    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
+      apiKey: 'codex-apikey-placeholder', // SDK requires a key but the fetch adapter handles auth
+      ...ARGS,
+      fetch: codexFetch as unknown as typeof globalThis.fetch,
+      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+    }
+    return new Anthropic(clientConfig)
   }
 
   // ── OpenAI-compatible chat/completions via apikey.json ──────────────

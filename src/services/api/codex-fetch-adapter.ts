@@ -62,21 +62,20 @@ export function isCodexModel(model: string): boolean {
 const JWT_CLAIM_PATH = 'https://api.openai.com/auth'
 
 /**
- * Extracts the account ID from a Codex JWT token.
- * @param token - The JWT token to extract the account ID from
- * @returns The account ID
- * @throws Error if the token is invalid or account ID cannot be extracted
+ * Extracts the account ID from a Codex JWT token. Returns null when the token
+ * is not a JWT (e.g. a plain OpenAI API key `sk-...`), in which case the
+ * `chatgpt-account-id` header is omitted.
  */
-function extractAccountId(token: string): string {
+function extractAccountId(token: string): string | null {
   try {
     const parts = token.split('.')
-    if (parts.length !== 3) throw new Error('Invalid token')
+    if (parts.length !== 3) return null
     const payload = JSON.parse(atob(parts[1]))
     const accountId = payload?.[JWT_CLAIM_PATH]?.chatgpt_account_id
-    if (!accountId) throw new Error('No account ID in token')
+    if (!accountId) return null
     return accountId
   } catch {
-    throw new Error('Failed to extract account ID from Codex token')
+    return null
   }
 }
 
@@ -749,14 +748,25 @@ async function translateCodexStreamToAnthropic(
 
 const CODEX_BASE_URL = 'https://chatgpt.com/backend-api/codex/responses'
 
+export type CreateCodexFetchOptions = {
+  accessToken: string
+  /**
+   * Override the Codex Responses endpoint. Defaults to the ChatGPT Codex
+   * backend (OAuth mode). Set this to an OpenAI-compatible `/v1/responses`
+   * URL when using a plain API key from apikey.json.
+   */
+  endpoint?: string
+}
+
 /**
  * Creates a fetch function that intercepts Anthropic API calls and routes them to Codex.
- * @param accessToken - The Codex access token for authentication
+ * @param options - Access token and optional endpoint override
  * @returns A fetch function that translates Anthropic requests to Codex format
  */
 export function createCodexFetch(
-  accessToken: string,
+  options: CreateCodexFetchOptions,
 ): (input: RequestInfo | URL, init?: RequestInit) => Promise<Response> {
+  const { accessToken, endpoint = CODEX_BASE_URL } = options
   const accountId = extractAccountId(accessToken)
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -788,17 +798,23 @@ export function createCodexFetch(
     // Translate to Codex format
     const { codexBody, codexModel } = translateToCodexBody(anthropicBody)
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      Authorization: `Bearer ${currentToken}`,
+      originator: 'pi',
+      'OpenAI-Beta': 'responses=experimental',
+    }
+    // chatgpt-account-id is only meaningful for ChatGPT OAuth JWTs; a plain
+    // API key has no account id, and sending a bogus header would 400.
+    if (accountId) {
+      headers['chatgpt-account-id'] = accountId
+    }
+
     // Call Codex API
-    const codexResponse = await globalThis.fetch(CODEX_BASE_URL, {
+    const codexResponse = await globalThis.fetch(endpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${currentToken}`,
-        'chatgpt-account-id': accountId,
-        originator: 'pi',
-        'OpenAI-Beta': 'responses=experimental',
-      },
+      headers,
       body: JSON.stringify(codexBody),
     })
 

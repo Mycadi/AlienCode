@@ -15,6 +15,7 @@ const APIKEY_ENV_KEYS = [
   'CLAUDE_CODE_SUBAGENT_MODEL',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_API_KIND',
 ] as const
 
 type ApiKeyEnvKey = (typeof APIKEY_ENV_KEYS)[number]
