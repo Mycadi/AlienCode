@@ -38,6 +38,7 @@ import {
   getDeferredToolsDeltaAttachment,
   getMcpInstructionsDeltaAttachment,
 } from '../../utils/attachments.js'
+import { getActiveApiKeyProfileName } from '../../utils/apikey.js'
 import { getMemoryPath } from '../../utils/config.js'
 import { isMemoryFilePath } from '../../utils/claudemd.js'
 import { COMPACT_MAX_OUTPUT_TOKENS } from '../../utils/context.js'
@@ -130,6 +131,14 @@ export const POST_COMPACT_MAX_TOKENS_PER_FILE = 5_000
 export const POST_COMPACT_MAX_TOKENS_PER_SKILL = 5_000
 export const POST_COMPACT_SKILLS_TOKEN_BUDGET = 25_000
 const MAX_COMPACT_STREAMING_RETRIES = 2
+
+export function shouldUseCompactCachePrefix(
+  featureEnabled: boolean,
+  apiKind = process.env.ANTHROPIC_API_KIND,
+  activeProfileName = getActiveApiKeyProfileName(),
+): boolean {
+  return !(activeProfileName && apiKind === 'codex') && featureEnabled
+}
 
 /**
  * Strip image blocks from user messages before sending for compaction.
@@ -1153,9 +1162,8 @@ async function streamCompactSummary({
   // main conversation's cached prefix (system prompt, tools, context messages).
   // Falls back to regular streaming path on failure.
   // 3P default: true — see comment at the other tengu_compact_cache_prefix read above.
-  const promptCacheSharingEnabled = getFeatureValue_CACHED_MAY_BE_STALE(
-    'tengu_compact_cache_prefix',
-    true,
+  const promptCacheSharingEnabled = shouldUseCompactCachePrefix(
+    getFeatureValue_CACHED_MAY_BE_STALE('tengu_compact_cache_prefix', true),
   )
   // Send keep-alive signals during compaction to prevent remote session
   // WebSocket idle timeouts from dropping bridge connections. Compaction

@@ -286,6 +286,37 @@ function translateToCodexBody(
   return { codexBody, codexModel }
 }
 
+export function prepareCodexRequestBody(
+  bodyText: string,
+  passthroughModel = false,
+): { body: string; codexModel: string } {
+  let anthropicBody: Record<string, unknown>
+  try {
+    anthropicBody = JSON.parse(bodyText)
+  } catch {
+    anthropicBody = {}
+  }
+
+  const { codexBody, codexModel } = translateToCodexBody(
+    anthropicBody,
+    passthroughModel,
+  )
+  return { body: JSON.stringify(codexBody), codexModel }
+}
+
+export async function prepareCodexRequest(
+  requestBody: BodyInit | null | undefined,
+  passthroughModel = false,
+): Promise<{ body: string; codexModel: string }> {
+  const bodyText =
+    requestBody instanceof ReadableStream
+      ? await new Response(requestBody).text()
+      : typeof requestBody === 'string'
+        ? requestBody
+        : '{}'
+  return prepareCodexRequestBody(bodyText, passthroughModel)
+}
+
 // ── Response translation: Codex SSE → Anthropic SSE ─────────────────
 
 /**
@@ -811,26 +842,14 @@ export function createCodexFetch(
       return globalThis.fetch(input, init)
     }
 
-    // Parse the Anthropic request body
-    let anthropicBody: Record<string, unknown>
-    try {
-      const bodyText =
-        init?.body instanceof ReadableStream
-          ? await new Response(init.body).text()
-          : typeof init?.body === 'string'
-            ? init.body
-            : '{}'
-      anthropicBody = JSON.parse(bodyText)
-    } catch {
-      anthropicBody = {}
-    }
+    const { body, codexModel } = await prepareCodexRequest(
+      init?.body,
+      passthroughModel,
+    )
 
     // Get current token (may have been refreshed)
     const tokens = getCodexOAuthTokens()
     const currentToken = tokens?.accessToken || accessToken
-
-    // Translate to Codex format
-    const { codexBody, codexModel } = translateToCodexBody(anthropicBody, passthroughModel)
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -849,7 +868,7 @@ export function createCodexFetch(
     const codexResponse = await globalThis.fetch(responsesUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(codexBody),
+      body,
     })
 
     if (codexResponse.ok) {
