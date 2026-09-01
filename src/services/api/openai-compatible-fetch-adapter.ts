@@ -195,6 +195,15 @@ function translateToOpenAIBody(
   const temperature = anthropicBody.temperature
   if (typeof temperature === 'number') body.temperature = temperature
 
+  // /effort arrives as output_config.effort (Anthropic shape). OpenAI-compatible
+  // endpoints take it as reasoning_effort and only know low/medium/high, so
+  // 'max' is clamped rather than rejected.
+  const effort = (anthropicBody.output_config as { effort?: unknown } | undefined)
+    ?.effort
+  if (typeof effort === 'string') {
+    body.reasoning_effort = effort === 'max' ? 'high' : effort
+  }
+
   const tools = (anthropicBody.tools || []) as AnthropicTool[]
   if (tools.length > 0) {
     body.tools = translateTools(tools)

@@ -170,7 +170,12 @@ import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from 'src/utils/claudeInChrome/prompt
 import { getMaxThinkingTokensForModel } from 'src/utils/context.js'
 import { logForDebugging } from 'src/utils/debug.js'
 import { logForDiagnosticsNoPII } from 'src/utils/diagLogs.js'
-import { type EffortValue, modelSupportsEffort } from 'src/utils/effort.js'
+import {
+  type EffortValue,
+  getEffortTransport,
+  getThinkingBudgetForEffort,
+  modelSupportsEffort,
+} from 'src/utils/effort.js'
 import {
   isFastModeAvailable,
   isFastModeCooldown,
@@ -448,7 +453,14 @@ function configureEffortParams(
   betas: string[],
   model: string,
 ): void {
-  if (!modelSupportsEffort(model) || 'effort' in outputConfig) {
+  // A 'thinking-budget' backend does not know output_config.effort — sending it
+  // (plus the effort beta header) to a 3P gateway risks a 400. Those models get
+  // their effort applied through thinking.budget_tokens instead.
+  if (
+    !modelSupportsEffort(model) ||
+    getEffortTransport(model) !== 'output-config' ||
+    'effort' in outputConfig
+  ) {
     return
   }
 
@@ -1609,7 +1621,17 @@ async function* queryModel(
     // without notifying the model launch DRI and research. This is a sensitive
     // setting that can greatly affect model quality and bashing.
     if (hasThinking && modelSupportsThinking(options.model)) {
+      // On a 'thinking-budget' backend (Anthropic-compatible 3P gateway) the
+      // token budget is the only reasoning dial available, so an explicit
+      // /effort choice has to go through it. Only low/medium yield a budget —
+      // high/max leave thinking exactly as it was.
+      const effortBudget =
+        options.effortValue !== undefined &&
+        getEffortTransport(options.model) === 'thinking-budget'
+          ? getThinkingBudgetForEffort(effort)
+          : undefined
       if (
+        effortBudget === undefined &&
         !isEnvTruthy(process.env.CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING) &&
         modelSupportsAdaptiveThinking(options.model)
       ) {
@@ -1627,6 +1649,9 @@ async function* queryModel(
           thinkingConfig.budgetTokens !== undefined
         ) {
           thinkingBudget = thinkingConfig.budgetTokens
+        }
+        if (effortBudget !== undefined) {
+          thinkingBudget = Math.min(thinkingBudget, effortBudget)
         }
         thinkingBudget = Math.min(maxOutputTokens - 1, thinkingBudget)
         thinking = {

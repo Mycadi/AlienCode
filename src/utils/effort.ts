@@ -3,8 +3,10 @@ import { isUltrathinkEnabled } from './thinking.js'
 import { getInitialSettings } from './settings/settings.js'
 import { isProSubscriber, isMaxSubscriber, isTeamSubscriber } from './auth.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from 'src/services/analytics/growthbook.js'
-import { getAPIProvider } from './model/providers.js'
+import { getAPIProvider, isFirstPartyAnthropicBaseUrl } from './model/providers.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
+import { isActiveApiKeyProfileModel, splitApiKeyModelRef } from './apikey.js'
+import { isOpenAICompatibleChatCompletionsUrl } from 'src/services/api/openai-compatible-fetch-adapter.js'
 import { isEnvTruthy } from './envUtils.js'
 import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
 
@@ -19,6 +21,73 @@ export const EFFORT_LEVELS = [
 
 export type EffortValue = EffortLevel | number
 
+export type EffortTransport = 'output-config' | 'thinking-budget' | 'none'
+
+/**
+ * True when an apikey.json profile serves this model — either an explicit
+ * `apikey:<profile>/<model>` ref or a bare id the active profile declares.
+ * Mirrors the profile pinning in createClient() (services/api/client.ts).
+ */
+function isApiKeyServedModel(model: string): boolean {
+  return splitApiKeyModelRef(model) !== null || isActiveApiKeyProfileModel(model)
+}
+
+/**
+ * How an effort selection reaches the backend serving `model`:
+ * - 'output-config': write output_config.effort. Native on 1P/Bedrock/Vertex/
+ *   Foundry; the Codex and OpenAI-compatible fetch adapters translate it into
+ *   reasoning.effort / reasoning_effort respectively.
+ * - 'thinking-budget': an Anthropic-compatible 3P gateway that does not know
+ *   output_config.effort but does honour thinking.budget_tokens.
+ * - 'none': the backend takes neither (Kiro/CodeWhisperer has no such field).
+ */
+export function getEffortTransport(model: string): EffortTransport {
+  if (isApiKeyServedModel(model)) {
+    // The active profile is already applied to env by applyApiKeyProfileToEnv().
+    if (process.env.ANTHROPIC_API_KIND === 'codex') {
+      return 'output-config'
+    }
+    if (isOpenAICompatibleChatCompletionsUrl(process.env.ANTHROPIC_BASE_URL)) {
+      return 'output-config'
+    }
+    return 'thinking-budget'
+  }
+  const provider = getAPIProvider()
+  if (provider === 'kiro') {
+    return 'none'
+  }
+  if (provider === 'openai') {
+    return 'output-config'
+  }
+  // Plain ANTHROPIC_BASE_URL override (no apikey.json) pointing at a gateway.
+  if (provider === 'firstParty' && !isFirstPartyAnthropicBaseUrl()) {
+    return 'thinking-budget'
+  }
+  return 'output-config'
+}
+
+/**
+ * Thinking budget to use when effort reaches the backend as
+ * thinking.budget_tokens (see getEffortTransport). Returns undefined for
+ * high/max so the model's existing default budget is left untouched — only
+ * low and medium actually tighten it.
+ */
+export function getThinkingBudgetForEffort(
+  value: EffortValue | undefined,
+): number | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+  switch (convertEffortValueToLevel(value)) {
+    case 'low':
+      return 4096
+    case 'medium':
+      return 12288
+    default:
+      return undefined
+  }
+}
+
 // @[MODEL LAUNCH]: Add the new model to the allowlist if it supports the effort parameter.
 export function modelSupportsEffort(model: string): boolean {
   const m = model.toLowerCase()
@@ -29,8 +98,18 @@ export function modelSupportsEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
+  // Never offer a dead control on a backend with no reasoning knob.
+  if (getEffortTransport(model) === 'none') {
+    return false
+  }
   // Supported by a subset of Claude 4 models
   if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {
+    return true
+  }
+  // apikey.json profiles and /login Codex accounts honour effort whatever the
+  // model is named (gateways use their own naming), so the Claude-4-only
+  // allowlist below must not gate them.
+  if (isApiKeyServedModel(model) || getAPIProvider() === 'openai') {
     return true
   }
   // Exclude any other known legacy models (haiku, older opus/sonnet variants)
