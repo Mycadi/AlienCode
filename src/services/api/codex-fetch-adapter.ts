@@ -429,21 +429,10 @@ async function translateCodexStreamToAnthropic(
             // ── Text output events ──────────────────────────────
             if (eventType === 'response.output_item.added') {
               const item = event.item as Record<string, unknown>
-              if (item?.type === 'reasoning') {
-                inReasoningBlock = true
-                controller.enqueue(
-                  encoder.encode(
-                    formatSSE(
-                      'content_block_start',
-                      JSON.stringify({
-                        type: 'content_block_start',
-                        index: contentBlockIndex,
-                        content_block: { type: 'thinking', thinking: '' },
-                      }),
-                    ),
-                  ),
-                )
-              } else if (item?.type === 'message') {
+              // `reasoning` items are intentionally ignored here: they often carry
+              // no summary deltas, and an empty thinking block poisons history for
+              // later Anthropic requests. The reasoning delta handler opens it.
+              if (item?.type === 'message') {
                 // New text message block starting
                 if (inToolCall) {
                   // Close the previous tool call block

@@ -2304,11 +2304,16 @@ export function normalizeMessagesForAPI(
     ? relocateToolReferenceSiblings(result)
     : result
 
+  // Drop thinking blocks that the API would reject outright (empty text or no
+  // signature). These enter history when the session switches between models or
+  // providers whose reasoning output isn't replayable as Anthropic thinking.
+  const withValidThinking = filterInvalidThinkingBlocks(relocated)
+
   // Filter orphaned thinking-only assistant messages (likely introduced by
   // compaction slicing away intervening messages between a failed streaming
   // response and its retry). Without this, consecutive assistant messages with
   // mismatched thinking block signatures cause API 400 errors.
-  const withFilteredOrphans = filterOrphanedThinkingOnlyMessages(relocated)
+  const withFilteredOrphans = filterOrphanedThinkingOnlyMessages(withValidThinking)
 
   // Order matters: strip trailing thinking first, THEN filter whitespace-only
   // messages. The reverse order has a bug: a message like [text("\n\n"), thinking("...")]
@@ -4805,6 +4810,46 @@ function isThinkingBlock(
   block: ContentBlockParam | ContentBlock | BetaContentBlock,
 ): block is ThinkingBlockType {
   return block.type === 'thinking' || block.type === 'redacted_thinking'
+}
+
+/**
+ * Drop thinking blocks the API rejects: `thinking` blocks with empty text or a
+ * missing signature, and `redacted_thinking` blocks with no data. Non-Anthropic
+ * models (e.g. the Codex adapter) produce reasoning that can't be replayed, so
+ * without this a model switch mid-session 400s on every request.
+ */
+function filterInvalidThinkingBlocks(
+  messages: (UserMessage | AssistantMessage)[],
+): (UserMessage | AssistantMessage)[] {
+  let changed = false
+  const result = messages.map(message => {
+    if (message.type !== 'assistant') {
+      return message
+    }
+    const content = message.message.content
+    if (!Array.isArray(content)) {
+      return message
+    }
+    const filtered = content.filter(block => {
+      if (block.type === 'thinking') {
+        return Boolean(block.thinking?.trim()) && Boolean(block.signature)
+      }
+      if (block.type === 'redacted_thinking') {
+        return Boolean(block.data)
+      }
+      return true
+    })
+    if (filtered.length === content.length) {
+      return message
+    }
+    changed = true
+    return {
+      ...message,
+      message: { ...message.message, content: filtered },
+    }
+  })
+
+  return changed ? result : messages
 }
 
 /**
