@@ -16,6 +16,7 @@ import type { Message } from '../../types/message.js';
 import type { PromptInputMode, VimMode } from '../../types/textInputTypes.js';
 import type { AutoUpdaterResult } from '../../utils/autoUpdater.js';
 import { isFullscreenEnvEnabled } from '../../utils/fullscreen.js';
+import { getCurrentUsage } from '../../utils/tokens.js';
 import { isUndercover } from '../../utils/undercover.js';
 import { CoordinatorTaskPanel, useCoordinatorTaskCount } from '../CoordinatorAgentStatus.js';
 import { getLastAssistantMessageId, StatusLine, statusLineShouldDisplay } from '../StatusLine.js';
@@ -60,6 +61,10 @@ type Props = {
   historyFailedMatch: boolean;
   onOpenTasksDialog?: (taskId?: string) => void;
 };
+// Absolute token threshold for the footer "Context too long" warning.
+// Applies to all models — the point is to nudge toward /compact well before
+// the request payload gets pathological, independent of any model's window.
+const CONTEXT_TOO_LONG_WARNING_TOKENS = 500_000;
 function PromptInputFooter({
   apiKeyStatus,
   debug,
@@ -102,6 +107,11 @@ function PromptInputFooter({
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
   const lastAssistantMessageId = useMemo(() => getLastAssistantMessageId(messages), [messages]);
+  const contextTokensUsed = useMemo(() => {
+    const usage = getCurrentUsage(messages);
+    if (!usage) return 0;
+    return usage.input_tokens + usage.cache_creation_input_tokens + usage.cache_read_input_tokens;
+  }, [messages]);
   const isNarrow = columns < 80;
   // In fullscreen the bottom slot is flexShrink:0, so every row here is a row
   // stolen from the ScrollBox. Drop the optional StatusLine first. Non-fullscreen
@@ -147,6 +157,9 @@ function PromptInputFooter({
           <BridgeStatusIndicator bridgeSelected={bridgeSelected} />
         </Box>
       </Box>
+      {contextTokensUsed > CONTEXT_TOO_LONG_WARNING_TOKENS && <Box height={1} paddingX={2} justifyContent="flex-end">
+          <Text color="red">Context too long. Use /compact</Text>
+        </Box>}
       {"external" === 'ant' && <CoordinatorTaskPanel />}
     </>;
 }
