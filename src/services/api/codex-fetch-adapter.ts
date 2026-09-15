@@ -348,6 +348,7 @@ async function translateCodexStreamToAnthropic(
       let contentBlockIndex = 0
       let outputTokens = 0
       let inputTokens = 0
+      let cachedTokens = 0
 
       // Emit Anthropic message_start
       controller.enqueue(
@@ -605,10 +606,19 @@ async function translateCodexStreamToAnthropic(
             // Response completed — extract usage
             else if (eventType === 'response.completed') {
               const response = event.response as Record<string, unknown>
-              const usage = response?.usage as Record<string, number> | undefined
+              const usage = response?.usage as
+                | (Record<string, number> & {
+                    input_tokens_details?: { cached_tokens?: number }
+                  })
+                | undefined
               if (usage) {
                 outputTokens = usage.output_tokens || outputTokens
-                inputTokens = usage.input_tokens || inputTokens
+                // Responses API reports input_tokens as the cache-inclusive total.
+                // The UI sums input + cache_read, so split them apart here to
+                // avoid double-counting the cached portion.
+                const total = usage.input_tokens || inputTokens
+                cachedTokens = usage.input_tokens_details?.cached_tokens || 0
+                inputTokens = Math.max(0, total - cachedTokens)
               }
             }
           }
@@ -663,7 +673,14 @@ async function translateCodexStreamToAnthropic(
         closeToolCallBlock(controller, encoder, contentBlockIndex, currentToolCallId, currentToolCallName, currentToolCallArgs)
       }
 
-      finishStream(controller, encoder, outputTokens, inputTokens, hadToolCalls)
+      finishStream(
+        controller,
+        encoder,
+        outputTokens,
+        inputTokens,
+        hadToolCalls,
+        cachedTokens,
+      )
     },
   })
 
@@ -725,6 +742,7 @@ async function translateCodexStreamToAnthropic(
     outputTokens: number,
     inputTokens: number,
     hadToolCalls: boolean,
+    cachedTokens = 0,
   ) {
     // Use 'tool_use' stop reason when model made tool calls
     const stopReason = hadToolCalls ? 'tool_use' : 'end_turn'
@@ -736,7 +754,13 @@ async function translateCodexStreamToAnthropic(
           JSON.stringify({
             type: 'message_delta',
             delta: { stop_reason: stopReason, stop_sequence: null },
-            usage: { output_tokens: outputTokens },
+            // message_stop is not fed through updateUsage, so the input side
+            // has to ride along here or it never reaches the UI.
+            usage: {
+              input_tokens: inputTokens,
+              cache_read_input_tokens: cachedTokens,
+              output_tokens: outputTokens,
+            },
           }),
         ),
       ),

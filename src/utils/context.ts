@@ -1,5 +1,6 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
 import { CONTEXT_1M_BETA_HEADER } from '../constants/betas.js'
+import { stripApiKeyModelRef } from './apikey.js'
 import { getGlobalConfig } from './config.js'
 import { isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
@@ -48,18 +49,33 @@ export function modelSupports1M(model: string): boolean {
   return canonical.includes('claude-sonnet-4') || canonical.includes('opus-4-6') || canonical.includes('opus-4-7') || canonical.includes('opus-4-8')
 }
 
+// Context windows for third-party models invisible to the first-party
+// capability lookup (apikey profiles, Kiro/Codex accounts). Matched by
+// substring on the apikey:-stripped, lowercased model id.
+const THIRD_PARTY_CONTEXT_WINDOWS: ReadonlyArray<readonly [string, number]> = [
+  ['gpt-5.6-sol', 1_050_000],
+  ['glm-5.3', 1_000_000],
+  ['deepseek-v4.1-flash', 1_000_000],
+  ['claude-opus-5', 1_000_000],
+  ['kimi-k3', 1_000_000],
+]
+
+function getThirdPartyContextWindow(model: string): number | undefined {
+  const id = stripApiKeyModelRef(model).toLowerCase()
+  return THIRD_PARTY_CONTEXT_WINDOWS.find(([pattern]) => id.includes(pattern))?.[1]
+}
+
 export function getContextWindowForModel(
   model: string,
   betas?: string[],
 ): number {
-  // Allow override via environment variable (ant-only)
+  // Allow override via environment variable.
   // This takes precedence over all other context window resolution, including 1M detection,
   // so users can cap the effective context window for local decisions (auto-compact, etc.)
   // while still using a 1M-capable endpoint.
-  if (
-    process.env.USER_TYPE === 'ant' &&
-    process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS
-  ) {
+  // Available to all users: capability lookup only works on first-party endpoints,
+  // so third-party models would otherwise be stuck on the 200k default.
+  if (process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS) {
     const override = parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_TOKENS, 10)
     if (!isNaN(override) && override > 0) {
       return override
@@ -93,6 +109,10 @@ export function getContextWindowForModel(
     if (antModel?.contextWindow) {
       return antModel.contextWindow
     }
+  }
+  const thirdParty = getThirdPartyContextWindow(model)
+  if (thirdParty) {
+    return thirdParty
   }
   return MODEL_CONTEXT_WINDOW_DEFAULT
 }
@@ -164,7 +184,12 @@ export function getModelMaxOutputTokens(model: string): {
 
   const m = getCanonicalName(model)
 
-  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8')) {
+  // claude-opus-5 canonicalizes to 'claude-opus' (firstPartyNameToCanonical has
+  // no 5.x mapping), so match the raw id before the canonical chain.
+  if (stripApiKeyModelRef(model).toLowerCase().includes('claude-opus-5')) {
+    defaultTokens = 64_000
+    upperLimit = 128_000
+  } else if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8')) {
     defaultTokens = 64_000
     upperLimit = 128_000
   } else if (m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {

@@ -398,7 +398,7 @@ function ModeIndicator({
   // Context usage indicator (for teammate pills path, which returns early below)
   if (hasTeammatePills && contextUsagePercent !== null) {
     parts.push(<Text dimColor key="context-usage">
-        context {contextUsagePercent}%
+        {contextUsagePercent}%
       </Text>);
   }
 
@@ -439,7 +439,7 @@ function ModeIndicator({
   // Context usage indicator
   if (contextUsagePercent !== null) {
     parts.push(<Text dimColor key="context-usage">
-        context {contextUsagePercent}%
+        {contextUsagePercent}%
       </Text>);
   }
 

@@ -187,6 +187,9 @@ function translateToOpenAIBody(
     model,
     messages,
     stream: true,
+    // Without this the upstream never reports prompt_tokens, leaving the
+    // context indicator with no input-token count at all.
+    stream_options: { include_usage: true },
   }
 
   const maxTokens = anthropicBody.max_tokens
@@ -247,6 +250,8 @@ function translateOpenAIStreamToAnthropic(
       let contentBlockIndex = 0
       let textBlockStarted = false
       let outputTokens = 0
+      let inputTokens = 0
+      let cachedTokens = 0
       const toolCallIndexes = new Map<number, number>()
       const toolCallStates = new Map<number, { id: string; name: string; args: string }>()
       let hadToolCalls = false
@@ -313,6 +318,19 @@ function translateOpenAIStreamToAnthropic(
               chunk = JSON.parse(data)
             } catch {
               continue
+            }
+
+            // The usage-bearing chunk carries an empty choices array, so this
+            // has to run before the !delta guard below or it gets skipped.
+            if (chunk.usage) {
+              // prompt_tokens includes the cached portion; the UI sums input
+              // and cache_read, so split them to avoid double-counting.
+              cachedTokens = chunk.usage.prompt_tokens_details?.cached_tokens || 0
+              inputTokens = Math.max(
+                0,
+                (chunk.usage.prompt_tokens || 0) - cachedTokens,
+              )
+              outputTokens = chunk.usage.completion_tokens || outputTokens
             }
 
             const choice = chunk.choices?.[0]
@@ -406,11 +424,17 @@ function translateOpenAIStreamToAnthropic(
       emitSSE(controller, encoder, 'message_delta', {
         type: 'message_delta',
         delta: { stop_reason: hadToolCalls ? 'tool_use' : 'end_turn', stop_sequence: null },
-        usage: { output_tokens: outputTokens },
+        // message_stop is not fed through updateUsage, so the input side has to
+        // ride along here or it never reaches the UI.
+        usage: {
+          input_tokens: inputTokens,
+          cache_read_input_tokens: cachedTokens,
+          output_tokens: outputTokens,
+        },
       })
       emitSSE(controller, encoder, 'message_stop', {
         type: 'message_stop',
-        usage: { input_tokens: 0, output_tokens: outputTokens },
+        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
       })
       controller.close()
     },

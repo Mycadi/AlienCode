@@ -145,11 +145,19 @@ export function getCurrentUsage(messages: Message[]): {
     const message = messages[i]
     const usage = message ? getTokenUsage(message) : undefined
     if (usage) {
+      const cacheCreation = usage.cache_creation_input_tokens ?? 0
+      const cacheRead = usage.cache_read_input_tokens ?? 0
+      // A provider reporting no input tokens at all has given us nothing
+      // usable. Returning zeros would look like real data and silently defeat
+      // the `??` estimation fallbacks downstream, so keep looking instead.
+      if (usage.input_tokens + cacheCreation + cacheRead === 0) {
+        continue
+      }
       return {
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
-        cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
-        cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
+        cache_creation_input_tokens: cacheCreation,
+        cache_read_input_tokens: cacheRead,
       }
     }
   }
