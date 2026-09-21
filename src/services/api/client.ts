@@ -156,8 +156,19 @@ export async function getAnthropicClient({
   const profileModel = activeProfile?.ANTHROPIC_MODEL
   // Aliases (opus/sonnet/haiku/subagent) resolve to the profile's bare model id
   // with no `apikey:` prefix, so also pin those to the profile.
+  //
+  // Exception: a bare id that the logged-in account itself serves (Kiro also
+  // offers claude-opus-5 / gpt-5.6-sol, which an apikey profile may declare
+  // too) stays with the account. Picking such a model in /model yields the bare
+  // id, while every apikey option carries the `apikey:` prefix — so without
+  // this the colliding id would silently burn the profile's credits.
+  const servedByLoginAccount =
+    !!model &&
+    ((isKiroSubscriber() && isKiroModel(model)) ||
+      (isCodexSubscriber() && isCodexModel(model)))
   const pinnedToProfile =
-    !!modelRef || (!!model && isActiveApiKeyProfileModel(model))
+    !!modelRef ||
+    (!!model && !servedByLoginAccount && isActiveApiKeyProfileModel(model))
   // Log API client configuration for HFI debugging
   logForDebugging(
     `[API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: ${!!process.env.ANTHROPIC_CUSTOM_HEADERS}, has Authorization header: ${!!customHeaders['Authorization']}`,

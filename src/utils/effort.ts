@@ -46,7 +46,7 @@ export function getEffortTransport(model: string): EffortTransport {
   if (provider === 'kiro') {
     return 'none'
   }
-  if (provider === 'Kimi') {
+  if (provider === 'openai') {
     return 'output-config'
   }
   if (isApiKeyServedModel(model)) {
