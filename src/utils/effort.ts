@@ -42,6 +42,13 @@ function isApiKeyServedModel(model: string): boolean {
  * - 'none': the backend takes neither (Kiro/CodeWhisperer has no such field).
  */
 export function getEffortTransport(model: string): EffortTransport {
+  const provider = getAPIProvider()
+  if (provider === 'kiro') {
+    return 'none'
+  }
+  if (provider === 'Kimi') {
+    return 'output-config'
+  }
   if (isApiKeyServedModel(model)) {
     // The active profile is already applied to env by applyApiKeyProfileToEnv().
     if (process.env.ANTHROPIC_API_KIND === 'codex') {
@@ -51,13 +58,6 @@ export function getEffortTransport(model: string): EffortTransport {
       return 'output-config'
     }
     return 'thinking-budget'
-  }
-  const provider = getAPIProvider()
-  if (provider === 'kiro') {
-    return 'none'
-  }
-  if (provider === 'openai') {
-    return 'output-config'
   }
   // Plain ANTHROPIC_BASE_URL override (no apikey.json) pointing at a gateway.
   if (provider === 'firstParty' && !isFirstPartyAnthropicBaseUrl()) {
