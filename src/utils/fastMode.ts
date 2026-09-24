@@ -172,7 +172,7 @@ export function isFastModeSupportedByModel(
   }
   const model = modelSetting ?? getDefaultMainLoopModelSetting()
   const parsedModel = parseUserSpecifiedModel(model)
-  return parsedModel.toLowerCase().includes('opus-4-6') || parsedModel.toLowerCase().includes('opus-4-7') || parsedModel.toLowerCase().includes('opus-4-8')
+  return parsedModel.toLowerCase().includes('opus-4-6') || parsedModel.toLowerCase().includes('opus-4-7') || parsedModel.toLowerCase().includes('opus-4-8') || parsedModel.toLowerCase().includes('opus-5-5')
 }
 
 // --- Fast mode runtime state ---

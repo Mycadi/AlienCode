@@ -170,6 +170,9 @@ function get3PFallbackSuggestion(model: string): string | undefined {
     return undefined
   }
   const lowerModel = model.toLowerCase()
+  if (lowerModel.includes('opus-5-5') || lowerModel.includes('opus_5_5')) {
+    return getModelStrings().opus48
+  }
   if (lowerModel.includes('opus-4-8') || lowerModel.includes('opus_4_8')) {
     return getModelStrings().opus46
   }

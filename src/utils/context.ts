@@ -46,16 +46,20 @@ export function modelSupports1M(model: string): boolean {
     return false
   }
   const canonical = getCanonicalName(model)
-  return canonical.includes('claude-sonnet-4') || canonical.includes('opus-4-6') || canonical.includes('opus-4-7') || canonical.includes('opus-4-8')
+  return canonical.includes('claude-sonnet-4') || canonical.includes('opus-4-6') || canonical.includes('opus-4-7') || canonical.includes('opus-4-8') || canonical.includes('opus-5-5')
 }
 
 // Context windows for third-party models invisible to the first-party
 // capability lookup (apikey profiles, Kiro/Codex accounts). Matched by
 // substring on the apikey:-stripped, lowercased model id.
 const THIRD_PARTY_CONTEXT_WINDOWS: ReadonlyArray<readonly [string, number]> = [
+  ['gpt-6-sol', 1_050_000],
+  ['gpt-6-luna', 1_000_000],
+  ['gpt-6-astra', 1_000_000],
   ['gpt-5.6-sol', 1_050_000],
   ['glm-5.3', 1_000_000],
   ['deepseek-v4.1-flash', 1_000_000],
+  // Also matches claude-opus-5-5 / claude-opus-5.5 by substring.
   ['claude-opus-5', 1_000_000],
   ['kimi-k3', 1_000_000],
 ]
@@ -184,8 +188,8 @@ export function getModelMaxOutputTokens(model: string): {
 
   const m = getCanonicalName(model)
 
-  // claude-opus-5 canonicalizes to 'claude-opus' (firstPartyNameToCanonical has
-  // no 5.x mapping), so match the raw id before the canonical chain.
+  // Bare claude-opus-5 (Kiro) canonicalizes to 'claude-opus', so match the raw
+  // id before the canonical chain. Also covers claude-opus-5-5 / 5.5.
   if (stripApiKeyModelRef(model).toLowerCase().includes('claude-opus-5')) {
     defaultTokens = 64_000
     upperLimit = 128_000

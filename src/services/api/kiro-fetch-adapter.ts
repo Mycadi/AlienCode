@@ -36,6 +36,10 @@ export const KIRO_MODELS = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', description: 'Kiro · 1.30x credits' },
   { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', description: 'Kiro · 2.20x credits' },
   { id: 'claude-opus-5', label: 'Claude Opus 5', description: 'Kiro · 2.20x credits' },
+  { id: 'claude-opus-5.5', label: 'Claude Opus 5.5', description: 'Kiro · 2.20x credits' },
+  { id: 'gpt-6-sol', label: 'GPT-6 Sol', description: 'Kiro · 2.40x credits' },
+  { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Kiro · 6.20x credits' },
+  { id: 'gpt-6-luna', label: 'GPT-6 Luna', description: 'Kiro · 0.60x credits' },
   { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Kiro · 2.40x credits' },
   { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Kiro · 1.20x credits' },
   { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Kiro · 0.60x credits' },
@@ -262,7 +266,7 @@ function translateToKiroBody(anthropicBody: Record<string, unknown>): {
   const tools = (anthropicBody.tools as AnthropicTool[] | undefined) ?? []
   const toolNames = new Set(tools.map(tool => tool.name))
   const shouldGuardLargeToolInput =
-    modelId === 'claude-opus-5' &&
+    modelId.startsWith('claude-opus-5') &&
     toolNames.has('Write') &&
     toolNames.has('Edit')
   const systemText =

@@ -102,6 +102,14 @@ export const CLAUDE_OPUS_4_8_CONFIG = {
   openai: 'claude-opus-4-8',
 } as const satisfies ModelConfig
 
+export const CLAUDE_OPUS_5_5_CONFIG = {
+  firstParty: 'claude-opus-5-5',
+  bedrock: 'us.anthropic.claude-opus-5-5-v1',
+  vertex: 'claude-opus-5-5',
+  foundry: 'claude-opus-5-5',
+  openai: 'claude-opus-5-5',
+} as const satisfies ModelConfig
+
 export const CLAUDE_SONNET_4_6_CONFIG = {
   firstParty: 'claude-sonnet-4-6',
   bedrock: 'us.anthropic.claude-sonnet-4-6',
@@ -127,6 +135,30 @@ export const CLAUDE_SONNET_4_8_CONFIG = {
 } as const satisfies ModelConfig
 
 // OpenAI Codex models
+export const GPT_6_SOL_CONFIG = {
+  firstParty: 'gpt-6-sol',
+  bedrock: 'gpt-6-sol',
+  vertex: 'gpt-6-sol',
+  foundry: 'gpt-6-sol',
+  openai: 'gpt-6-sol',
+} as const satisfies ModelConfig
+
+export const GPT_6_LUNA_CONFIG = {
+  firstParty: 'gpt-6-luna',
+  bedrock: 'gpt-6-luna',
+  vertex: 'gpt-6-luna',
+  foundry: 'gpt-6-luna',
+  openai: 'gpt-6-luna',
+} as const satisfies ModelConfig
+
+export const GPT_6_ASTRA_CONFIG = {
+  firstParty: 'gpt-6-astra',
+  bedrock: 'gpt-6-astra',
+  vertex: 'gpt-6-astra',
+  foundry: 'gpt-6-astra',
+  openai: 'gpt-6-astra',
+} as const satisfies ModelConfig
+
 export const GPT_5_5_CONFIG = {
   firstParty: 'gpt-5.5',
   bedrock: 'gpt-5.5',
@@ -176,7 +208,11 @@ export const ALL_MODEL_CONFIGS = {
   opus46: CLAUDE_OPUS_4_6_CONFIG,
   opus47: CLAUDE_OPUS_4_7_CONFIG,
   opus48: CLAUDE_OPUS_4_8_CONFIG,
+  opus55: CLAUDE_OPUS_5_5_CONFIG,
   // OpenAI Codex models
+  gpt6sol: GPT_6_SOL_CONFIG,
+  gpt6luna: GPT_6_LUNA_CONFIG,
+  gpt6astra: GPT_6_ASTRA_CONFIG,
   gpt55: GPT_5_5_CONFIG,
   gpt54: GPT_5_4_CONFIG,
   gpt53codex: GPT_5_3_CODEX_CONFIG,

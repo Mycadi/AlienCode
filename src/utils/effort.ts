@@ -103,7 +103,7 @@ export function modelSupportsEffort(model: string): boolean {
     return false
   }
   // Supported by a subset of Claude 4 models
-  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {
+  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('opus-5-5') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {
     return true
   }
   // apikey.json profiles and /login Codex accounts honour effort whatever the
@@ -134,7 +134,7 @@ export function modelSupportsMaxEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8')) {
+  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8') || model.toLowerCase().includes('opus-5-5')) {
     return true
   }
   if (process.env.USER_TYPE === 'ant' && resolveAntModel(model)) {
@@ -385,7 +385,7 @@ export function getDefaultEffortForModel(
 
   // Default effort on Opus 4.6 to medium for Pro.
   // Max/Team also get medium when the tengu_grey_step2 config is enabled.
-  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8')) {
+  if (model.toLowerCase().includes('opus-4-6') || model.toLowerCase().includes('opus-4-7') || model.toLowerCase().includes('opus-4-8') || model.toLowerCase().includes('opus-5-5')) {
     if (isProSubscriber()) {
       return 'medium'
     }

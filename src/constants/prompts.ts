@@ -712,7 +712,9 @@ export async function computeSimpleEnvInfo(
 // @[MODEL LAUNCH]: Add a knowledge cutoff date for the new model.
 function getKnowledgeCutoff(modelId: string): string | null {
   const canonical = getCanonicalName(modelId)
-  if (canonical.includes('claude-sonnet-4-8')) {
+  if (canonical.includes('claude-opus-5-5')) {
+    return 'May 2025'
+  } else if (canonical.includes('claude-sonnet-4-8')) {
     return 'August 2025'
   } else if (canonical.includes('claude-sonnet-4-7')) {
     return 'August 2025'

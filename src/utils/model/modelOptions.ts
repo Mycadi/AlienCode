@@ -93,6 +93,27 @@ export function getOpus46_1MOption(fastMode = false): ModelOption {
   }
 }
 
+// Opus 5.5 is addressed by its explicit model id on every provider — the
+// `opus` alias still resolves to 4.8, so selecting it must not be ambiguous.
+function getOpus55Option(fastMode = false): ModelOption {
+  return {
+    value: getModelStrings().opus55,
+    label: 'Opus 5.5',
+    description: `Opus 5.5 · Latest Opus generation${getOpus48PricingSuffix(fastMode)}`,
+    descriptionForModel: 'Opus 5.5 - latest Opus generation',
+  }
+}
+
+export function getOpus55_1MOption(fastMode = false): ModelOption {
+  return {
+    value: getModelStrings().opus55 + '[1m]',
+    label: 'Opus 5.5 (1M context)',
+    description: `Opus 5.5 with 1M context${getOpus48PricingSuffix(fastMode)}`,
+    descriptionForModel:
+      'Opus 5.5 with 1M context window - for long sessions with large codebases',
+  }
+}
+
 function getHaiku45Option(): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
   return {
@@ -105,6 +126,33 @@ function getHaiku45Option(): ModelOption {
 }
 
 // OpenAI Codex model options
+function getGpt6SolOption(): ModelOption {
+  return {
+    value: 'gpt-6-sol',
+    label: 'GPT-6 Sol',
+    description: 'GPT-6 Sol · Most capable GPT-6 variant',
+    descriptionForModel: 'GPT-6 Sol - most capable GPT-6 variant',
+  }
+}
+
+function getGpt6AstraOption(): ModelOption {
+  return {
+    value: 'gpt-6-astra',
+    label: 'GPT-6 Astra',
+    description: 'GPT-6 Astra · Deep reasoning for hard problems',
+    descriptionForModel: 'GPT-6 Astra - deep reasoning for hard problems',
+  }
+}
+
+function getGpt6LunaOption(): ModelOption {
+  return {
+    value: 'gpt-6-luna',
+    label: 'GPT-6 Luna',
+    description: 'GPT-6 Luna · Fast and efficient for simple tasks',
+    descriptionForModel: 'GPT-6 Luna - fast and efficient for simple tasks',
+  }
+}
+
 function getGpt55Option(): ModelOption {
   return {
     value: 'gpt-5.5',
@@ -237,6 +285,8 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
     return [
       ...antModelOptions,
       getMergedOpus1MOption(fastMode),
+      getOpus55Option(fastMode),
+      getOpus55_1MOption(fastMode),
       getSonnet46Option(),
       getSonnet46_1MOption(),
       getHaiku45Option(),
@@ -246,6 +296,9 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   // Codex subscribers get OpenAI model options
   if (isCodexSubscriber()) {
     return [
+      getGpt6SolOption(),
+      getGpt6AstraOption(),
+      getGpt6LunaOption(),
       getGpt55Option(),
       getGpt54Option(),
       getGpt53CodexOption(),
@@ -266,6 +319,11 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
         : [getMaxOpusOption(fastMode)]
       if (!isOpus1mMergeEnabled() && checkOpus1mAccess()) {
         premiumOptions.push(getMaxOpus46_1MOption(fastMode))
+      }
+
+      premiumOptions.push(getOpus55Option(fastMode))
+      if (checkOpus1mAccess() || isOpus1mMergeEnabled()) {
+        premiumOptions.push(getOpus55_1MOption(fastMode))
       }
 
       premiumOptions.push(MaxSonnet46Option)
@@ -292,6 +350,11 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       }
     }
 
+    standardOptions.push(getOpus55Option(fastMode))
+    if (checkOpus1mAccess() || isOpus1mMergeEnabled()) {
+      standardOptions.push(getOpus55_1MOption(fastMode))
+    }
+
     standardOptions.push(MaxHaiku45Option)
     return standardOptions
   }
@@ -311,7 +374,12 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
 
   // API key / 3P provider users: list the concrete models directly.
   // getModelOptions() will still append apikey/env/custom model options below.
-  return [getSonnet46Option(), getOpus46Option(fastMode), getHaiku45Option()]
+  return [
+    getSonnet46Option(),
+    getOpus46Option(fastMode),
+    getOpus55Option(fastMode),
+    getHaiku45Option(),
+  ]
 }
 
 /**

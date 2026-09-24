@@ -53,7 +53,8 @@ export function isNonCustomOpusModel(model: ModelName): boolean {
     model === getModelStrings().opus45 ||
     model === getModelStrings().opus46 ||
     model === getModelStrings().opus47 ||
-    model === getModelStrings().opus48
+    model === getModelStrings().opus48 ||
+    model === getModelStrings().opus55
   )
 }
 
@@ -238,6 +239,9 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   name = name.toLowerCase()
   // Special cases for Claude 4+ models to differentiate versions
   // Order matters: check more specific versions first (4-8 before 4-7 before 4-6 etc.)
+  if (name.includes('claude-opus-5-5')) {
+    return 'claude-opus-5-5'
+  }
   if (name.includes('claude-opus-4-8')) {
     return 'claude-opus-4-8'
   }
@@ -294,6 +298,15 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
     return 'claude-3-haiku'
   }
   // OpenAI GPT models
+  if (name.includes('gpt-6-sol')) {
+    return 'gpt-6-sol'
+  }
+  if (name.includes('gpt-6-luna')) {
+    return 'gpt-6-luna'
+  }
+  if (name.includes('gpt-6-astra')) {
+    return 'gpt-6-astra'
+  }
   if (name.includes('gpt-5.5')) {
     return 'gpt-5.5'
   }
@@ -405,6 +418,9 @@ export function renderModelSetting(setting: ModelName | ModelAlias): string {
  */
 export function getPublicModelDisplayName(model: ModelName): string | null {
   if (model.includes('gpt-') || model.includes('codex')) {
+    if (model === 'gpt-6-sol') return 'GPT-6 Sol'
+    if (model === 'gpt-6-luna') return 'GPT-6 Luna'
+    if (model === 'gpt-6-astra') return 'GPT-6 Astra'
     if (model === 'gpt-5.2-codex') return 'Codex 5.2'
     if (model === 'gpt-5.1-codex') return 'Codex 5.1'
     if (model === 'gpt-5.1-codex-mini') return 'Codex 5.1 Mini'
@@ -416,6 +432,10 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
   }
 
   switch (model) {
+    case getModelStrings().opus55:
+      return 'Opus 5.5'
+    case getModelStrings().opus55 + '[1m]':
+      return 'Opus 5.5 (1M context)'
     case getModelStrings().opus48:
       return 'Opus 4.8'
     case getModelStrings().opus48 + '[1m]':
@@ -672,6 +692,9 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   const has1m = lowerModelId.includes('[1m]')
   const canonical = getCanonicalName(modelId)
 
+  if (canonical.includes('claude-opus-5-5')) {
+    return has1m ? 'Opus 5.5 (with 1M context)' : 'Opus 5.5'
+  }
   if (canonical.includes('claude-opus-4-8')) {
     return has1m ? 'Opus 4.8 (with 1M context)' : 'Opus 4.8'
   }
@@ -718,6 +741,15 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
     return 'Claude 3.5 Haiku'
   }
   // OpenAI Codex models
+  if (canonical.includes('gpt-6-sol')) {
+    return 'GPT-6 Sol'
+  }
+  if (canonical.includes('gpt-6-luna')) {
+    return 'GPT-6 Luna'
+  }
+  if (canonical.includes('gpt-6-astra')) {
+    return 'GPT-6 Astra'
+  }
   if (canonical.includes('gpt-5.5')) {
     return 'GPT-5.5'
   }
