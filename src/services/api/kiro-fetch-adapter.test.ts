@@ -21,7 +21,7 @@ async function translate(events: unknown[]): Promise<string> {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     body: JSON.stringify({
-      model: 'gpt-5.6-sol',
+      model: 'claude-sonnet-5.5',
       messages: [{ role: 'user', content: 'Inspect the project' }],
       tools: [
         {

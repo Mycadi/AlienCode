@@ -348,7 +348,7 @@ export function getClaudeAiUserDefaultModelDescription(
     return 'GPT-5.3 Codex · Optimized for code generation and understanding'
   }
   if (isKiroSubscriber()) {
-    return 'Claude Sonnet 5 · Kiro subscription (Claude/GPT via CodeWhisperer)'
+    return 'Claude Sonnet 5.5 · Kiro subscription (Claude via CodeWhisperer)'
   }
   if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
     if (isOpus1mMergeEnabled()) {

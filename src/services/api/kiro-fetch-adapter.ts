@@ -33,19 +33,11 @@ import { roughTokenCountEstimation } from '../tokenEstimation.js'
 
 // ── Available Kiro models ───────────────────────────────────────────
 export const KIRO_MODELS = [
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', description: 'Kiro · 1.30x credits' },
-  { id: 'claude-opus-4.8', label: 'Claude Opus 4.8', description: 'Kiro · 2.20x credits' },
-  { id: 'claude-opus-5', label: 'Claude Opus 5', description: 'Kiro · 2.20x credits' },
-  { id: 'claude-opus-5.5', label: 'Claude Opus 5.5', description: 'Kiro · 2.20x credits' },
-  { id: 'gpt-6-sol', label: 'GPT-6 Sol', description: 'Kiro · 2.40x credits' },
-  { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Kiro · 6.20x credits' },
-  { id: 'gpt-6-luna', label: 'GPT-6 Luna', description: 'Kiro · 0.60x credits' },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Kiro · 2.40x credits' },
-  { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', description: 'Kiro · 1.20x credits' },
-  { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', description: 'Kiro · 0.60x credits' },
+  { id: 'claude-opus-5.5', label: 'Claude Opus 5.5', description: 'Kiro · 2.00x credits' },
+  { id: 'claude-sonnet-5.5', label: 'Claude Sonnet 5.5', description: 'Kiro · 1.30x credits' },
 ] as const
 
-export const DEFAULT_KIRO_MODEL = 'claude-sonnet-5'
+export const DEFAULT_KIRO_MODEL = 'claude-sonnet-5.5'
 const DEFAULT_KIRO_STREAM_IDLE_TIMEOUT_MS = 60_000
 const KIRO_OPUS_5_LARGE_TOOL_INPUT_GUARD =
   'IMPORTANT Kiro tool-call reliability rule: Every Write or Edit call MUST have a complete serialized JSON input of at most 3000 characters. Inputs above this limit can be truncated and fail. NEVER put more than 1800 characters in content or new_string. For larger files, MUST use one small Write followed by multiple sequential small Edit calls. NEVER place a large file in one Write call.'
@@ -63,8 +55,8 @@ export function mapClaudeModelToKiro(claudeModel: string | null): string {
   if (!claudeModel) return DEFAULT_KIRO_MODEL
   if (isKiroModel(claudeModel)) return claudeModel
   const lower = claudeModel.toLowerCase()
-  if (lower.includes('opus')) return 'claude-opus-4.8'
-  if (lower.includes('sonnet')) return 'claude-sonnet-5'
+  if (lower.includes('opus')) return 'claude-opus-5.5'
+  if (lower.includes('sonnet')) return 'claude-sonnet-5.5'
   return DEFAULT_KIRO_MODEL
 }
 
