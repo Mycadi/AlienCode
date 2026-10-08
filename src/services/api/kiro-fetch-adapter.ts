@@ -39,6 +39,9 @@ export const KIRO_MODELS = [
 
 export const DEFAULT_KIRO_MODEL = 'claude-sonnet-5.5'
 const DEFAULT_KIRO_STREAM_IDLE_TIMEOUT_MS = 60_000
+// Kiro tends to emit a tool's input in one burst after generating it fully,
+// so large Write/Edit inputs can stay silent far longer than plain text.
+const KIRO_TOOL_INPUT_IDLE_TIMEOUT_MS = 300_000
 const KIRO_OPUS_5_LARGE_TOOL_INPUT_GUARD =
   'IMPORTANT Kiro tool-call reliability rule: Every Write or Edit call MUST have a complete serialized JSON input of at most 3000 characters. Inputs above this limit can be truncated and fail. NEVER put more than 1800 characters in content or new_string. For larger files, MUST use one small Write followed by multiple sequential small Edit calls. NEVER place a large file in one Write call.'
 
@@ -656,7 +659,11 @@ function kiroStreamToAnthropic(
         for (;;) {
           let timeoutId: ReturnType<typeof setTimeout> | undefined
           const idleTimeout = new Promise<null>(resolve => {
-            timeoutId = setTimeout(() => resolve(null), idleTimeoutMs)
+            const waitMs =
+              blockOpen && blockKind === 'tool'
+                ? Math.max(idleTimeoutMs, KIRO_TOOL_INPUT_IDLE_TIMEOUT_MS)
+                : idleTimeoutMs
+            timeoutId = setTimeout(() => resolve(null), waitMs)
           })
           const result = await Promise.race([reader.read(), idleTimeout])
           if (timeoutId) clearTimeout(timeoutId)
