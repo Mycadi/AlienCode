@@ -31,6 +31,14 @@ type OpenAIMessage = {
 
 const CHAT_COMPLETIONS_SUFFIX = '/v1/chat/completions'
 
+// OpenAI reasoning models (GPT-5/6 families, o-series) reject `max_tokens` and
+// require `max_completion_tokens`. Other gateways (GLM/DeepSeek/Kimi/Claude)
+// only understand `max_tokens`, so the switch has to be model-scoped.
+export function usesMaxCompletionTokens(model: string): boolean {
+  const id = model.toLowerCase()
+  return /(^|\/)(gpt-[5-9]|o[1-9])/.test(id)
+}
+
 export function isOpenAICompatibleChatCompletionsUrl(url?: string): boolean {
   if (!url) return false
   try {
@@ -193,7 +201,13 @@ function translateToOpenAIBody(
   }
 
   const maxTokens = anthropicBody.max_tokens
-  if (typeof maxTokens === 'number') body.max_tokens = maxTokens
+  if (typeof maxTokens === 'number') {
+    if (usesMaxCompletionTokens(model)) {
+      body.max_completion_tokens = maxTokens
+    } else {
+      body.max_tokens = maxTokens
+    }
+  }
 
   const temperature = anthropicBody.temperature
   if (typeof temperature === 'number') body.temperature = temperature

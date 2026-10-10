@@ -47,6 +47,7 @@ import { createKiroFetch, isKiroModel } from './kiro-fetch-adapter.js'
 import {
   createOpenAICompatibleFetch,
   isOpenAICompatibleChatCompletionsUrl,
+  usesMaxCompletionTokens,
 } from './openai-compatible-fetch-adapter.js'
 
 /**
@@ -409,6 +410,31 @@ export async function getAnthropicClient({
     })
     const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
       apiKey: 'codex-apikey-placeholder', // SDK requires a key but the fetch adapter handles auth
+      ...ARGS,
+      fetch: codexFetch as unknown as typeof globalThis.fetch,
+      ...(isDebugToStdErr() && { logger: createStderrLogger() }),
+    }
+    return new Anthropic(clientConfig)
+  }
+
+  // ── OpenAI reasoning model behind an Anthropic-native gateway ──────────
+  // Gateways like modelverse forward `max_tokens` on /v1/messages, which
+  // GPT-5+/o-series reject; their chat/completions also refuses tools together
+  // with reasoning_effort. Only /v1/responses works, so use the Codex adapter.
+  if (
+    authToken &&
+    baseURL &&
+    !isOpenAICompatibleChatCompletionsUrl(baseURL) &&
+    adapterModel &&
+    usesMaxCompletionTokens(adapterModel)
+  ) {
+    const codexFetch = createCodexFetch({
+      accessToken: authToken,
+      endpoint: `${baseURL.replace(/\/+$/, '').replace(/\/v1$/, '')}/v1/responses`,
+      passthroughModel: true,
+    })
+    const clientConfig: ConstructorParameters<typeof Anthropic>[0] = {
+      apiKey: 'codex-apikey-placeholder',
       ...ARGS,
       fetch: codexFetch as unknown as typeof globalThis.fetch,
       ...(isDebugToStdErr() && { logger: createStderrLogger() }),
