@@ -714,6 +714,8 @@ function getKnowledgeCutoff(modelId: string): string | null {
   const canonical = getCanonicalName(modelId)
   if (canonical.includes('claude-opus-5-5')) {
     return 'May 2025'
+  } else if (canonical.includes('claude-sonnet-5-5')) {
+    return 'May 2025'
   } else if (canonical.includes('claude-sonnet-4-8')) {
     return 'August 2025'
   } else if (canonical.includes('claude-sonnet-4-7')) {

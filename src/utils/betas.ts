@@ -149,6 +149,7 @@ export function modelSupportsStructuredOutputs(model: string): boolean {
   return (
     canonical.includes('claude-sonnet-4-6') ||
     canonical.includes('claude-sonnet-4-7') ||
+    canonical.includes('claude-sonnet-5-5') ||
     canonical.includes('claude-sonnet-4-8') ||
     canonical.includes('claude-sonnet-4-5') ||
     canonical.includes('claude-opus-4-1') ||

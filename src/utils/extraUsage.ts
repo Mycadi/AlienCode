@@ -15,7 +15,7 @@ export function isBilledAsExtraUsage(
     .replace(/\[1m\]$/, '')
     .trim()
   const isOpus46Plus = m === 'opus' || m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('opus-5-5')
-  const isSonnet46Plus = m === 'sonnet' || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')
+  const isSonnet46Plus = m === 'sonnet' || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8') || m.includes('sonnet-5-5')
 
   if (isOpus46Plus && isOpus1mMerged) return false
 

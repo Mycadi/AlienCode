@@ -103,7 +103,7 @@ export function modelSupportsEffort(model: string): boolean {
     return false
   }
   // Supported by a subset of Claude 4 models
-  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('opus-5-5') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8')) {
+  if (m.includes('opus-4-6') || m.includes('opus-4-7') || m.includes('opus-4-8') || m.includes('opus-5-5') || m.includes('sonnet-4-6') || m.includes('sonnet-4-7') || m.includes('sonnet-4-8') || m.includes('sonnet-5-5')) {
     return true
   }
   // apikey.json profiles and /login Codex accounts honour effort whatever the

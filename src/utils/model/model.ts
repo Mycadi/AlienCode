@@ -205,17 +205,17 @@ export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
     )
   }
 
-  // Max users get Opus as default
-  if (isMaxSubscriber()) {
-    return getDefaultOpusModel() + (isOpus1mMergeEnabled() ? '[1m]' : '')
+  // Max and Team Premium users get Opus 5.5 as default
+  if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
+    return getModelStrings().opus55
   }
 
-  // Team Premium gets Opus (same as Max)
-  if (isTeamPremiumSubscriber()) {
-    return getDefaultOpusModel() + (isOpus1mMergeEnabled() ? '[1m]' : '')
+  // Other Claude.ai subscribers (Pro, Team Standard, Enterprise) get Sonnet 5.5
+  if (isClaudeAISubscriber()) {
+    return getModelStrings().sonnet55
   }
 
-  // PAYG (1P and 3P), Enterprise, Team Standard, and Pro get Sonnet as default
+  // PAYG (1P and 3P) get Sonnet as default
   // Note that PAYG (3P) may default to an older Sonnet model
   return getDefaultSonnetModel()
 }
@@ -259,6 +259,9 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
   }
   if (name.includes('claude-opus-4')) {
     return 'claude-opus-4'
+  }
+  if (name.includes('claude-sonnet-5-5')) {
+    return 'claude-sonnet-5-5'
   }
   if (name.includes('claude-sonnet-4-8')) {
     return 'claude-sonnet-4-8'
@@ -360,10 +363,10 @@ export function getClaudeAiUserDefaultModelDescription(
     return 'Claude Sonnet 5.5 · Kiro subscription (Claude via CodeWhisperer)'
   }
   if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
-    if (isOpus1mMergeEnabled()) {
-      return `Opus 4.8 with 1M context · Most capable for complex work${fastMode ? getOpus48PricingSuffix(true) : ''}`
-    }
-    return `Opus 4.8 · Most capable for complex work${fastMode ? getOpus48PricingSuffix(true) : ''}`
+    return `Opus 5.5 · Latest Opus generation${fastMode ? getOpus48PricingSuffix(true) : ''}`
+  }
+  if (isClaudeAISubscriber()) {
+    return 'Sonnet 5.5 · Latest Sonnet generation'
   }
   return 'Sonnet 4.8 · Best for everyday tasks'
 }
@@ -466,6 +469,10 @@ export function getPublicModelDisplayName(model: ModelName): string | null {
       return 'Opus 4.1'
     case getModelStrings().opus40:
       return 'Opus 4'
+    case getModelStrings().sonnet55 + '[1m]':
+      return 'Sonnet 5.5 (1M context)'
+    case getModelStrings().sonnet55:
+      return 'Sonnet 5.5'
     case getModelStrings().sonnet48 + '[1m]':
       return 'Sonnet 4.8 (1M context)'
     case getModelStrings().sonnet48:
@@ -724,6 +731,9 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
   }
   if (canonical.includes('claude-opus-4')) {
     return 'Opus 4'
+  }
+  if (canonical.includes('claude-sonnet-5-5')) {
+    return has1m ? 'Sonnet 5.5 (with 1M context)' : 'Sonnet 5.5'
   }
   if (canonical.includes('claude-sonnet-4-8')) {
     return has1m ? 'Sonnet 4.8 (with 1M context)' : 'Sonnet 4.8'

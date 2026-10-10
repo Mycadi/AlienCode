@@ -6,8 +6,6 @@ import {
   isClaudeAISubscriber,
   isCodexSubscriber,
   isKiroSubscriber,
-  isMaxSubscriber,
-  isTeamPremiumSubscriber,
 } from '../auth.js'
 import { getModelStrings } from './modelStrings.js'
 import {
@@ -16,7 +14,6 @@ import {
   formatModelPricing,
 } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
-import { checkOpus1mAccess, checkSonnet1mAccess } from './check1mAccess.js'
 import { getAPIProvider } from './providers.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import {
@@ -26,7 +23,6 @@ import {
   getDefaultHaikuModel,
   getMarketingNameForModel,
   getUserSpecifiedModelSetting,
-  isOpus1mMergeEnabled,
   getOpus48PricingSuffix,
   type ModelSetting,
 } from './model.js'
@@ -114,6 +110,18 @@ export function getOpus55_1MOption(fastMode = false): ModelOption {
   }
 }
 
+// Sonnet 5.5 is addressed by its explicit model id — the `sonnet` alias still
+// resolves to 4.8.
+function getSonnet55Option(): ModelOption {
+  const is3P = getAPIProvider() !== 'firstParty'
+  return {
+    value: getModelStrings().sonnet55,
+    label: 'Sonnet 5.5',
+    description: `Sonnet 5.5 · Latest Sonnet generation${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
+    descriptionForModel: 'Sonnet 5.5 - latest Sonnet generation',
+  }
+}
+
 function getHaiku45Option(): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
   return {
@@ -185,25 +193,6 @@ function getMaxOpusOption(fastMode = false): ModelOption {
   }
 }
 
-export function getMaxSonnet46_1MOption(): ModelOption {
-  const is3P = getAPIProvider() !== 'firstParty'
-  const billingInfo = isClaudeAISubscriber() ? ' · Billed as extra usage' : ''
-  return {
-    value: 'sonnet[1m]',
-    label: 'Sonnet (1M context)',
-    description: `Sonnet 4.8 with 1M context${billingInfo}${is3P ? '' : ` · ${formatModelPricing(COST_TIER_3_15)}`}`,
-  }
-}
-
-export function getMaxOpus46_1MOption(fastMode = false): ModelOption {
-  const billingInfo = isClaudeAISubscriber() ? ' · Billed as extra usage' : ''
-  return {
-    value: 'opus[1m]',
-    label: 'Opus (1M context)',
-    description: `Opus 4.8 with 1M context${billingInfo}${getOpus48PricingSuffix(fastMode)}`,
-  }
-}
-
 function getMergedOpus1MOption(fastMode = false): ModelOption {
   const is3P = getAPIProvider() !== 'firstParty'
   return {
@@ -213,18 +202,6 @@ function getMergedOpus1MOption(fastMode = false): ModelOption {
     descriptionForModel:
       'Opus 4.8 with 1M context - most capable for complex work',
   }
-}
-
-const MaxSonnet46Option: ModelOption = {
-  value: 'sonnet',
-  label: 'Sonnet',
-  description: 'Sonnet 4.8 · Best for everyday tasks',
-}
-
-const MaxHaiku45Option: ModelOption = {
-  value: 'haiku',
-  label: 'Haiku',
-  description: 'Haiku 4.5 · Fastest for quick answers',
 }
 
 function getOpusPlanOption(): ModelOption {
@@ -272,51 +249,7 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   }
 
   if (isClaudeAISubscriber()) {
-    if (isMaxSubscriber() || isTeamPremiumSubscriber()) {
-      // Max and Team Premium users: Opus first, Sonnet as alternative
-      const premiumOptions = isOpus1mMergeEnabled()
-        ? [getMergedOpus1MOption(fastMode)]
-        : [getMaxOpusOption(fastMode)]
-      if (!isOpus1mMergeEnabled() && checkOpus1mAccess()) {
-        premiumOptions.push(getMaxOpus46_1MOption(fastMode))
-      }
-
-      premiumOptions.push(getOpus55Option(fastMode))
-      if (checkOpus1mAccess() || isOpus1mMergeEnabled()) {
-        premiumOptions.push(getOpus55_1MOption(fastMode))
-      }
-
-      premiumOptions.push(MaxSonnet46Option)
-      if (checkSonnet1mAccess()) {
-        premiumOptions.push(getMaxSonnet46_1MOption())
-      }
-
-      premiumOptions.push(MaxHaiku45Option)
-      return premiumOptions
-    }
-
-    // Pro/Team Standard/Enterprise users: Sonnet first, Opus as alternative
-    const standardOptions = [MaxSonnet46Option]
-    if (checkSonnet1mAccess()) {
-      standardOptions.push(getMaxSonnet46_1MOption())
-    }
-
-    if (isOpus1mMergeEnabled()) {
-      standardOptions.push(getMergedOpus1MOption(fastMode))
-    } else {
-      standardOptions.push(getMaxOpusOption(fastMode))
-      if (checkOpus1mAccess()) {
-        standardOptions.push(getMaxOpus46_1MOption(fastMode))
-      }
-    }
-
-    standardOptions.push(getOpus55Option(fastMode))
-    if (checkOpus1mAccess() || isOpus1mMergeEnabled()) {
-      standardOptions.push(getOpus55_1MOption(fastMode))
-    }
-
-    standardOptions.push(MaxHaiku45Option)
-    return standardOptions
+    return [getOpus55Option(fastMode), getSonnet55Option()]
   }
 
   // No account, no API key, no apikey.json profile: nothing to run on, so

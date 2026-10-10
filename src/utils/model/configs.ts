@@ -134,6 +134,14 @@ export const CLAUDE_SONNET_4_8_CONFIG = {
   openai: 'claude-sonnet-4-8',
 } as const satisfies ModelConfig
 
+export const CLAUDE_SONNET_5_5_CONFIG = {
+  firstParty: 'claude-sonnet-5-5',
+  bedrock: 'us.anthropic.claude-sonnet-5-5',
+  vertex: 'claude-sonnet-5-5',
+  foundry: 'claude-sonnet-5-5',
+  openai: 'claude-sonnet-5-5',
+} as const satisfies ModelConfig
+
 // OpenAI Codex models
 export const GPT_6_1_SOL_CONFIG = {
   firstParty: 'gpt-6.1-sol',
@@ -226,6 +234,7 @@ export const ALL_MODEL_CONFIGS = {
   sonnet46: CLAUDE_SONNET_4_6_CONFIG,
   sonnet47: CLAUDE_SONNET_4_7_CONFIG,
   sonnet48: CLAUDE_SONNET_4_8_CONFIG,
+  sonnet55: CLAUDE_SONNET_5_5_CONFIG,
   opus40: CLAUDE_OPUS_4_CONFIG,
   opus41: CLAUDE_OPUS_4_1_CONFIG,
   opus45: CLAUDE_OPUS_4_5_CONFIG,

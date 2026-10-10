@@ -95,6 +95,7 @@ export function modelSupportsAdvisor(model: string): boolean {
     m.includes('opus-5-5') ||
     m.includes('sonnet-4-6') ||
     m.includes('sonnet-4-7') ||
+    m.includes('sonnet-5-5') ||
     m.includes('sonnet-4-8') ||
     process.env.USER_TYPE === 'ant'
   )
@@ -110,6 +111,7 @@ export function isValidAdvisorModel(model: string): boolean {
     m.includes('opus-5-5') ||
     m.includes('sonnet-4-6') ||
     m.includes('sonnet-4-7') ||
+    m.includes('sonnet-5-5') ||
     m.includes('sonnet-4-8') ||
     process.env.USER_TYPE === 'ant'
   )
