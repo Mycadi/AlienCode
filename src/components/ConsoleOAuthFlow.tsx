@@ -461,22 +461,9 @@ function OAuthStatusMessage(t0) {
         } else {
           t4 = $[3];
         }
-        let t5;
-        if ($[4] === Symbol.for("react.memo_cache_sentinel")) {
-          t5 = {
-            label: <Text>Anthropic Console account ·{" "}<Text dimColor={true}>API usage billing</Text>{"\n"}</Text>,
-            value: "console"
-          };
-          $[4] = t5;
-        } else {
-          t5 = $[4];
-        }
         let t6;
         if ($[5] === Symbol.for("react.memo_cache_sentinel")) {
-          t6 = [t4, t5, {
-            label: <Text>3rd-party platform ·{" "}<Text dimColor={true}>Amazon Bedrock, Microsoft Foundry, or Vertex AI</Text>{"\n"}</Text>,
-            value: "platform"
-          }, {
+          t6 = [t4, {
             label: <Text>OpenAI Codex account ·{" "}<Text dimColor={true}>ChatGPT Plus/Pro subscription</Text>{"\n"}</Text>,
             value: "codex"
           }, {
@@ -490,14 +477,7 @@ function OAuthStatusMessage(t0) {
         let t7;
         if ($[6] !== setLoginWithClaudeAi || $[7] !== setOAuthStatus || $[8] !== setLoginWithCodex || $[53] !== setLoginWithKiro) {
           t7 = <Box><Select options={t6} onChange={value_0 => {
-              if (value_0 === "platform") {
-                logEvent("tengu_oauth_platform_selected", {});
-                setLoginWithCodex(false);
-                setLoginWithKiro(false);
-                setOAuthStatus({
-                  state: "platform_setup"
-                });
-              } else if (value_0 === "codex") {
+              if (value_0 === "codex") {
                 logEvent("tengu_oauth_codex_selected", {});
                 setLoginWithCodex(true);
                 setLoginWithKiro(false);
@@ -510,18 +490,13 @@ function OAuthStatusMessage(t0) {
                 setLoginWithClaudeAi(false);
                 setOAuthStatus({ state: "ready_to_start" });
               } else {
+                logEvent("tengu_oauth_claudeai_selected", {});
                 setLoginWithCodex(false);
                 setLoginWithKiro(false);
+                setLoginWithClaudeAi(true);
                 setOAuthStatus({
                   state: "ready_to_start"
                 });
-                if (value_0 === "claudeai") {
-                  logEvent("tengu_oauth_claudeai_selected", {});
-                  setLoginWithClaudeAi(true);
-                } else {
-                  logEvent("tengu_oauth_console_selected", {});
-                  setLoginWithClaudeAi(false);
-                }
               }
             }} /></Box>;
           $[6] = setLoginWithClaudeAi;
