@@ -126,6 +126,33 @@ function getHaiku45Option(): ModelOption {
 }
 
 // OpenAI Codex model options
+function getGpt61SolOption(): ModelOption {
+  return {
+    value: 'gpt-6.1-sol',
+    label: 'GPT-6.1 Sol',
+    description: 'GPT-6.1 Sol · Most capable GPT-6.1 variant',
+    descriptionForModel: 'GPT-6.1 Sol - most capable GPT-6.1 variant',
+  }
+}
+
+function getGpt61AstraOption(): ModelOption {
+  return {
+    value: 'gpt-6.1-astra',
+    label: 'GPT-6.1 Astra',
+    description: 'GPT-6.1 Astra · Deep reasoning for hard problems',
+    descriptionForModel: 'GPT-6.1 Astra - deep reasoning for hard problems',
+  }
+}
+
+function getGpt61LunaOption(): ModelOption {
+  return {
+    value: 'gpt-6.1-luna',
+    label: 'GPT-6.1 Luna',
+    description: 'GPT-6.1 Luna · Fast and efficient for simple tasks',
+    descriptionForModel: 'GPT-6.1 Luna - fast and efficient for simple tasks',
+  }
+}
+
 function getGpt6SolOption(): ModelOption {
   return {
     value: 'gpt-6-sol',
@@ -296,6 +323,9 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   // Codex subscribers get OpenAI model options
   if (isCodexSubscriber()) {
     return [
+      getGpt61SolOption(),
+      getGpt61AstraOption(),
+      getGpt61LunaOption(),
       getGpt6SolOption(),
       getGpt6AstraOption(),
       getGpt6LunaOption(),

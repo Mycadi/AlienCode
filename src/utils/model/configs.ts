@@ -135,6 +135,30 @@ export const CLAUDE_SONNET_4_8_CONFIG = {
 } as const satisfies ModelConfig
 
 // OpenAI Codex models
+export const GPT_6_1_SOL_CONFIG = {
+  firstParty: 'gpt-6.1-sol',
+  bedrock: 'gpt-6.1-sol',
+  vertex: 'gpt-6.1-sol',
+  foundry: 'gpt-6.1-sol',
+  openai: 'gpt-6.1-sol',
+} as const satisfies ModelConfig
+
+export const GPT_6_1_LUNA_CONFIG = {
+  firstParty: 'gpt-6.1-luna',
+  bedrock: 'gpt-6.1-luna',
+  vertex: 'gpt-6.1-luna',
+  foundry: 'gpt-6.1-luna',
+  openai: 'gpt-6.1-luna',
+} as const satisfies ModelConfig
+
+export const GPT_6_1_ASTRA_CONFIG = {
+  firstParty: 'gpt-6.1-astra',
+  bedrock: 'gpt-6.1-astra',
+  vertex: 'gpt-6.1-astra',
+  foundry: 'gpt-6.1-astra',
+  openai: 'gpt-6.1-astra',
+} as const satisfies ModelConfig
+
 export const GPT_6_SOL_CONFIG = {
   firstParty: 'gpt-6-sol',
   bedrock: 'gpt-6-sol',
@@ -210,6 +234,9 @@ export const ALL_MODEL_CONFIGS = {
   opus48: CLAUDE_OPUS_4_8_CONFIG,
   opus55: CLAUDE_OPUS_5_5_CONFIG,
   // OpenAI Codex models
+  gpt61sol: GPT_6_1_SOL_CONFIG,
+  gpt61luna: GPT_6_1_LUNA_CONFIG,
+  gpt61astra: GPT_6_1_ASTRA_CONFIG,
   gpt6sol: GPT_6_SOL_CONFIG,
   gpt6luna: GPT_6_LUNA_CONFIG,
   gpt6astra: GPT_6_ASTRA_CONFIG,

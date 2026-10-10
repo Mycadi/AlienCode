@@ -20,6 +20,9 @@ import { getCodexOAuthTokens } from '../../utils/auth.js'
 
 // ── Available Codex models ──────────────────────────────────────────
 export const CODEX_MODELS = [
+  { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', description: 'Most capable GPT-6.1 variant' },
+  { id: 'gpt-6.1-astra', label: 'GPT-6.1 Astra', description: 'Deep reasoning GPT-6.1 variant' },
+  { id: 'gpt-6.1-luna', label: 'GPT-6.1 Luna', description: 'Fast GPT-6.1 variant' },
   { id: 'gpt-6-sol', label: 'GPT-6 Sol', description: 'Most capable GPT-6 variant' },
   { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Deep reasoning GPT-6 variant' },
   { id: 'gpt-6-luna', label: 'GPT-6 Luna', description: 'Fast GPT-6 variant' },

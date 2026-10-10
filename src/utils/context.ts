@@ -53,6 +53,9 @@ export function modelSupports1M(model: string): boolean {
 // capability lookup (apikey profiles, Kiro/Codex accounts). Matched by
 // substring on the apikey:-stripped, lowercased model id.
 const THIRD_PARTY_CONTEXT_WINDOWS: ReadonlyArray<readonly [string, number]> = [
+  ['gpt-6.1-sol', 1_050_000],
+  ['gpt-6.1-luna', 1_000_000],
+  ['gpt-6.1-astra', 1_000_000],
   ['gpt-6-sol', 1_050_000],
   ['gpt-6-luna', 1_000_000],
   ['gpt-6-astra', 1_000_000],

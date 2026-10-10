@@ -298,6 +298,15 @@ export function firstPartyNameToCanonical(name: ModelName): ModelShortName {
     return 'claude-3-haiku'
   }
   // OpenAI GPT models
+  if (name.includes('gpt-6.1-sol')) {
+    return 'gpt-6.1-sol'
+  }
+  if (name.includes('gpt-6.1-luna')) {
+    return 'gpt-6.1-luna'
+  }
+  if (name.includes('gpt-6.1-astra')) {
+    return 'gpt-6.1-astra'
+  }
   if (name.includes('gpt-6-sol')) {
     return 'gpt-6-sol'
   }
@@ -418,6 +427,9 @@ export function renderModelSetting(setting: ModelName | ModelAlias): string {
  */
 export function getPublicModelDisplayName(model: ModelName): string | null {
   if (model.includes('gpt-') || model.includes('codex')) {
+    if (model === 'gpt-6.1-sol') return 'GPT-6.1 Sol'
+    if (model === 'gpt-6.1-luna') return 'GPT-6.1 Luna'
+    if (model === 'gpt-6.1-astra') return 'GPT-6.1 Astra'
     if (model === 'gpt-6-sol') return 'GPT-6 Sol'
     if (model === 'gpt-6-luna') return 'GPT-6 Luna'
     if (model === 'gpt-6-astra') return 'GPT-6 Astra'
@@ -741,6 +753,15 @@ export function getMarketingNameForModel(modelId: string): string | undefined {
     return 'Claude 3.5 Haiku'
   }
   // OpenAI Codex models
+  if (canonical.includes('gpt-6.1-sol')) {
+    return 'GPT-6.1 Sol'
+  }
+  if (canonical.includes('gpt-6.1-luna')) {
+    return 'GPT-6.1 Luna'
+  }
+  if (canonical.includes('gpt-6.1-astra')) {
+    return 'GPT-6.1 Astra'
+  }
   if (canonical.includes('gpt-6-sol')) {
     return 'GPT-6 Sol'
   }
