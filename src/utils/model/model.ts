@@ -190,7 +190,7 @@ export function getRuntimeMainLoopModel(params: {
  */
 export function getDefaultMainLoopModelSetting(): ModelName | ModelAlias {
   if (isCodexSubscriber()) {
-    return getModelStrings().gpt53codex
+    return getModelStrings().gpt61sol
   }
 
   if (isKiroSubscriber()) {
@@ -354,7 +354,7 @@ export function getClaudeAiUserDefaultModelDescription(
   fastMode = false,
 ): string {
   if (isCodexSubscriber()) {
-    return 'GPT-5.3 Codex · Optimized for code generation and understanding'
+    return 'GPT-6.1 Sol · Most capable GPT-6.1 variant'
   }
   if (isKiroSubscriber()) {
     return 'Claude Sonnet 5.5 · Kiro subscription (Claude via CodeWhisperer)'

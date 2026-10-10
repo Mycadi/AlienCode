@@ -294,7 +294,7 @@ export function formatLogoModelSource(
   }
 
   if (isCodexSubscriber()) {
-    if (model === 'gpt-5.5' || model === 'gpt-5.4' || model === 'gpt-5.3-codex') {
+    if (model === 'gpt-6.1-sol' || model === 'gpt-6.1-astra' || model === 'gpt-6.1-luna') {
       const effort = getDisplayedEffortLevel(model, effortValue)
       return {
         modelName: `${modelDisplayName} · ${effort}`,

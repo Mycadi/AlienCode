@@ -23,21 +23,9 @@ export const CODEX_MODELS = [
   { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', description: 'Most capable GPT-6.1 variant' },
   { id: 'gpt-6.1-astra', label: 'GPT-6.1 Astra', description: 'Deep reasoning GPT-6.1 variant' },
   { id: 'gpt-6.1-luna', label: 'GPT-6.1 Luna', description: 'Fast GPT-6.1 variant' },
-  { id: 'gpt-6-sol', label: 'GPT-6 Sol', description: 'Most capable GPT-6 variant' },
-  { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Deep reasoning GPT-6 variant' },
-  { id: 'gpt-6-luna', label: 'GPT-6 Luna', description: 'Fast GPT-6 variant' },
-  { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex', description: 'Frontier agentic coding model' },
-  { id: 'gpt-5.1-codex', label: 'GPT-5.1 Codex', description: 'Codex coding model' },
-  { id: 'gpt-5.1-codex-mini', label: 'GPT-5.1 Codex Mini', description: 'Fast Codex model' },
-  { id: 'gpt-5.1-codex-max', label: 'GPT-5.1 Codex Max', description: 'Max Codex model' },
-  { id: 'gpt-5.5', label: 'GPT-5.5', description: 'Latest GPT' },
-  { id: 'gpt-5.4', label: 'GPT-5.4', description: 'GPT-5.4' },
-  { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini', description: 'Fast GPT model' },
-  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', description: 'Codex coding model' },
-  { id: 'gpt-5.2', label: 'GPT-5.2', description: 'GPT-5.2' },
 ] as const
 
-export const DEFAULT_CODEX_MODEL = 'gpt-5.2-codex'
+export const DEFAULT_CODEX_MODEL = 'gpt-6.1-sol'
 
 /**
  * Maps Claude model names to corresponding Codex model names.
@@ -48,9 +36,9 @@ export function mapClaudeModelToCodex(claudeModel: string | null): string {
   if (!claudeModel) return DEFAULT_CODEX_MODEL
   if (isCodexModel(claudeModel)) return claudeModel
   const lower = claudeModel.toLowerCase()
-  if (lower.includes('opus')) return 'gpt-5.1-codex-max'
-  if (lower.includes('haiku')) return 'gpt-5.1-codex-mini'
-  if (lower.includes('sonnet')) return 'gpt-5.2-codex'
+  if (lower.includes('opus')) return 'gpt-6.1-astra'
+  if (lower.includes('haiku')) return 'gpt-6.1-luna'
+  if (lower.includes('sonnet')) return 'gpt-6.1-sol'
   return DEFAULT_CODEX_MODEL
 }
 

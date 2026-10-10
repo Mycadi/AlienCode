@@ -153,69 +153,6 @@ function getGpt61LunaOption(): ModelOption {
   }
 }
 
-function getGpt6SolOption(): ModelOption {
-  return {
-    value: 'gpt-6-sol',
-    label: 'GPT-6 Sol',
-    description: 'GPT-6 Sol · Most capable GPT-6 variant',
-    descriptionForModel: 'GPT-6 Sol - most capable GPT-6 variant',
-  }
-}
-
-function getGpt6AstraOption(): ModelOption {
-  return {
-    value: 'gpt-6-astra',
-    label: 'GPT-6 Astra',
-    description: 'GPT-6 Astra · Deep reasoning for hard problems',
-    descriptionForModel: 'GPT-6 Astra - deep reasoning for hard problems',
-  }
-}
-
-function getGpt6LunaOption(): ModelOption {
-  return {
-    value: 'gpt-6-luna',
-    label: 'GPT-6 Luna',
-    description: 'GPT-6 Luna · Fast and efficient for simple tasks',
-    descriptionForModel: 'GPT-6 Luna - fast and efficient for simple tasks',
-  }
-}
-
-function getGpt55Option(): ModelOption {
-  return {
-    value: 'gpt-5.5',
-    label: 'GPT-5.5',
-    description: 'GPT-5.5 · Advanced reasoning and code generation',
-    descriptionForModel: 'GPT-5.5 - advanced reasoning and code generation capabilities',
-  }
-}
-
-function getGpt54Option(): ModelOption {
-  return {
-    value: 'gpt-5.4',
-    label: 'GPT-5.4',
-    description: 'GPT-5.4 · Advanced reasoning and code generation',
-    descriptionForModel: 'GPT-5.4 - advanced reasoning and code generation capabilities',
-  }
-}
-
-function getGpt53CodexOption(): ModelOption {
-  return {
-    value: 'gpt-5.3-codex',
-    label: 'GPT-5.3 Codex',
-    description: 'GPT-5.3 Codex · Optimized for code generation and understanding',
-    descriptionForModel: 'GPT-5.3 Codex - specialized for code generation and understanding',
-  }
-}
-
-function getGpt54MiniOption(): ModelOption {
-  return {
-    value: 'gpt-5.4-mini',
-    label: 'GPT-5.4 Mini',
-    description: 'GPT-5.4 Mini · Fast and efficient for simple tasks',
-    descriptionForModel: 'GPT-5.4 Mini - fast and efficient for simple coding tasks',
-  }
-}
-
 // Kiro (AWS CodeWhisperer) model options
 function getKiroModelOptions(): ModelOption[] {
   return KIRO_MODELS.map(model => ({
@@ -326,13 +263,6 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
       getGpt61SolOption(),
       getGpt61AstraOption(),
       getGpt61LunaOption(),
-      getGpt6SolOption(),
-      getGpt6AstraOption(),
-      getGpt6LunaOption(),
-      getGpt55Option(),
-      getGpt54Option(),
-      getGpt53CodexOption(),
-      getGpt54MiniOption(),
     ]
   }
 
