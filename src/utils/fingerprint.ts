@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import type { AssistantMessage, UserMessage } from '../types/message.js'
+import { WIRE_VERSION } from './userAgent.js'
 
 /**
  * Hardcoded salt from backend validation.
@@ -72,5 +73,5 @@ export function computeFingerprintFromMessages(
   messages: (UserMessage | AssistantMessage)[],
 ): string {
   const firstMessageText = extractFirstMessageText(messages)
-  return computeFingerprint(firstMessageText, MACRO.VERSION)
+  return computeFingerprint(firstMessageText, WIRE_VERSION)
 }
